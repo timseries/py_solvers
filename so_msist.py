@@ -24,6 +24,7 @@ class MSIST(Section):
         self.W = None #the transform (or composition of transforms)
         self.Hhat = None
         self.Hhat_star = None
+        
     def solve(self,dict_in):
         """
         Takes an input object (ground truth, forward model observation, metrics required)
