@@ -1,9 +1,10 @@
 #!/usr/bin/python -tt
 import numpy as np
-from numpy import arange, fftn, ifftn, conj 
+from numpy import arange, conj
+from numpy.fft import fftn, ifftn
 from numpy import abs as nabs
 from py_utils.signal_utilities import ws as ws
-import sig_utils as su
+import py_utils.signal_utilities.sig_utils as su
 from py_solvers.solver import Solver
 from py_operators.operator import Operator
 from py_operators.operator_comp import OperatorComp
@@ -29,14 +30,13 @@ class MSIST(Solver):
         if self.alpha == 0: #alpha override wasn't supplied, so compute
             self.alpha = su.spectral_radius(self.T,self.H)
         self.str_group_structure = self.get_val('grouptypes',False)
-        self.results = Results(ps_parameters,self.get_val('transforms',False))    
 
     def solve(self,dict_in):
         """
         Takes an input object (ground truth, forward model observation, metrics required)
         Returns a solution object based on the solver this object was instantiated with.
         """
-        self.results.clear()
+        super(MSIST,self).solve(ps_parameters,str_section)
         Hhat = self.Hhat
         W = self.W
         Hhat_star = self.Hhat_star
@@ -51,13 +51,13 @@ class MSIST(Solver):
         elif self.str_group_structure == 'complexself':
             g_i = 2
         elif self.str_group_structure == 'parentchildren':
-            #TODO: figure out group sizes
+            g_i = 2
         elif self.str_group_structure == 'parentchild':
-            #TODO: figure out group sizes
+            g_i = 2
         else:    
-            raise Exception("no such group structure " + )
+            raise Exception("no such group structure " + self.str_group_structure)
         #input parameters and initialization
-        S_n = W * x_n
+        S_n = W * np.zeros(x_n.shape)
         w_n = W * x_n
         if self.str_solver_variant == 'solvereal': #msist
             epsilon = dict_in['epsilon']
@@ -80,11 +80,11 @@ class MSIST(Solver):
                     S_n.set_subbands(s,1 / (1 / g_i * nabs(w_n.get_subband(s))**2 + epsilon[n]**2))
                 elif self.str_solver_variant == 'solvevbmm': #vbmm    
                     S_n.set_subband(s, (2 * p_a + g_i) / (2 * p_b + nabs(w_n.get_subband(s))**2))
-                    b_n.set_subband(s, (p_k + p_a)/(p_theta + S_n.get_subband(s))
+                    b_n.set_subband(s, (p_k + p_a)/(p_theta + S_n.get_subband(s)))
                 #update current solution
                 w_n.set_subband(s, \
                   (ary_alpha[s]*w_n.get_subband(s)+w_resid.get_subband(s)) / \
-                  (ary_alpha[s]+(nu[n]**2) * S_n.get_subbands(s))
+                  (ary_alpha[s]+(nu[n]**2) * S_n.get_subbands(s)))
                 #update results
                 self.results.update(dict_in,x_n,w_n)
             x_n = ~W * w_n
