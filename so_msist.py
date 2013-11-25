@@ -70,7 +70,7 @@ class MSIST(Solver):
             for s in arange(ws_resid.int_subbands):
                 b_n.set_subbands(s, p_b_0)
         else:
-            raise Exception("no such MSIST solver variant " + self.str_solver_variant + " supported")
+            raise Exception("no MSIST solver variant " + self.str_solver_variant)
         #begin iterations here
         for n in np.arange(self.int_iterations):
             w_resid = W * ifftn(conj(Hhat_star) * (y_hat - Hhat * fftn(x_n)))
