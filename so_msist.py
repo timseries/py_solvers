@@ -80,11 +80,11 @@ class MSIST(Solver):
                     S_n.set_subbands(s,1 / (1 / g_i * nabs(w_n.get_subband(s))**2 + epsilon[n]**2))
                 elif self.str_solver_variant == 'solvevbmm': #vbmm    
                     S_n.set_subband(s, (2 * p_a + g_i) / (2 * p_b + nabs(w_n.get_subband(s))**2))
-                    b_n.set_subband(s, (p_k + p_a)/(p_theta + S_n.get_subband(s)))
+                    b_n.set_subband(s, (p_k + p_a) / (p_theta + S_n.get_subband(s)))
                 #update current solution
                 w_n.set_subband(s, \
-                  (ary_alpha[s]*w_n.get_subband(s)+w_resid.get_subband(s)) / \
-                  (ary_alpha[s]+(nu[n]**2) * S_n.get_subbands(s)))
+                  (ary_alpha[s] * w_n.get_subband(s)+w_resid.get_subband(s)) / \
+                  (ary_alpha[s] + (nu[n]**2) * S_n.get_subbands(s)))
                 #update results
                 self.results.update(dict_in,x_n,w_n)
             x_n = ~W * w_n
