@@ -83,7 +83,7 @@ class MSIST(Solver):
                     b_n.set_subband(s, (p_k + p_a) / (p_theta + S_n.get_subband(s)))
                 #update current solution
                 w_n.set_subband(s, \
-                  (ary_alpha[s] * w_n.get_subband(s)+w_resid.get_subband(s)) / \
+                  (ary_alpha[s] * w_n.get_subband(s) + w_resid.get_subband(s)) / \
                   (ary_alpha[s] + (nu[n]**2) * S_n.get_subbands(s)))
                 #update results
                 self.results.update(dict_in,x_n,w_n)
