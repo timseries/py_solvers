@@ -2,7 +2,7 @@
 import numpy as np
 from numpy import arange, conj
 from numpy.fft import fftn, ifftn
-from numpy import abs as nabs
+from numpy import abs as nabs, exp, max as nmax
 from py_utils.signal_utilities import ws as ws
 import py_utils.signal_utilities.sig_utils as su
 from py_solvers.solver import Solver
@@ -19,16 +19,13 @@ class MSIST(Solver):
         """
         super(MSIST,self).__init__(ps_parameters,str_section)
         self.str_solver_variant = self.get_val('solvervariant',False)
-        self.str_nu_epsilon_method = self.get_val('nuepsilonmethod',False)
+        
         self.str_variance_method = self.get_val('variance_method',False)
         self.alpha = None
         self.H = OperatorComp(ps_parameters,self.get_val('modalities',False))
         self.W = OperatorComp(ps_parameters,self.get_val('transforms',False))
-        self.Hhat = self.H.get_spectrum
-        self.Hhat_star = conj(self.Hhat)
+        self.W = self.W.ls_operators[0] #assume we just have one transform
         self.alpha = self.get_val('alpha',True)
-        if self.alpha == 0: #alpha override wasn't supplied, so compute
-            self.alpha = su.spectral_radius(self.T,self.H)
         self.str_group_structure = self.get_val('grouptypes',False)
 
     def solve(self,dict_in):
@@ -36,15 +33,13 @@ class MSIST(Solver):
         Takes an input object (ground truth, forward model observation, metrics required)
         Returns a solution object based on the solver this object was instantiated with.
         """
-        super(MSIST,self).solve(ps_parameters,str_section)
-        Hhat = self.Hhat
+        super(MSIST,self).solve()
+        H = self.H
         W = self.W
-        Hhat_star = self.Hhat_star
+
         #input data 
-        y_hat = dict_in['y_hat']
+        y_hat = dict_in['yhat']
         x_n = dict_in['x_0']
-        ary_alpha = dict_in['alpha']
-        nu = dict_in['nu']
         #group structure
         if self.str_group_structure == 'self':
             g_i = 1
@@ -54,13 +49,18 @@ class MSIST(Solver):
             g_i = 2
         elif self.str_group_structure == 'parentchild':
             g_i = 2
-        else:    
+        elif self.str_group_structure == '':
+            g_i = 2
+        else:
             raise Exception("no such group structure " + self.str_group_structure)
         #input parameters and initialization
+        if self.alpha == 0: #alpha override wasn't supplied, so compute
+            self.alpha = su.spectral_radius(self.W,self.H,dict_in['x_0'].shape)
+
         S_n = W * np.zeros(x_n.shape)
         w_n = W * x_n
         if self.str_solver_variant == 'solvereal': #msist
-            epsilon = dict_in['epsilon']
+            epsilon,nu = get_nu_epsilon(self)
         elif self.str_solver_variant == 'solvevbmm': #vbmm    
             p_a = dict_in['p_a']
             p_b_0 = dict_in['p_b_0']
@@ -73,7 +73,7 @@ class MSIST(Solver):
             raise Exception("no MSIST solver variant " + self.str_solver_variant)
         #begin iterations here
         for n in np.arange(self.int_iterations):
-            w_resid = W * ifftn(conj(Hhat_star) * (y_hat - Hhat * fftn(x_n)))
+            w_resid = W * ifftn(~H * ifftn(y_hat - H * x_n))
             for s in arange(1,w_n.int_subbands):
                 #variance estimate
                 if self.str_solver_variant == 'solvereal': #msist
@@ -92,7 +92,34 @@ class MSIST(Solver):
         dict_in['x_n'] = x_n
         dict_in['w_n'] = w_n
         return dict_in
-    
+
+    def get_nu_epsilon(self):
+        '''
+        A method for generating the sequences of nu and epsilon using some continuation rule.
+        '''
+        str_method = self.get_val('nuepsilonmethod', False)
+        decay = self.get_val('decay', True)
+        epsilon_start = self.get_val('epsilonstart', True)
+        epsilon_stop = self.get_val('epsilonstop', True)
+        nu_start = self.get_val('nustart', True)
+        nu_stop = self.get_val('nustop', True)
+        if str_method == 'geometric':
+            epsilon = np.asarray([nmax(epsilon_start * (decay ** i),epsilon_stop) \
+                                  for i in arange(self.int_iterations)])
+            nu = np.asarray([nmax(nu_start * (decay ** i),nu_stop) \
+                                  for i in arange(self.int_iterations)])
+        elif str_method == 'exponential':
+            epsilon = np.asarray([epsilon_start * exp(-i / decay) + epsilon_stop \
+                                  for i in arange(self.int_iterations)])
+            nu = np.asarray([nu_start * exp(-i / decay) + nu_stop \
+                                  for i in arange(self.int_iterations)])
+        elif str_method == 'fixed':    
+            epsilon = epsilon_start
+            nu = nu_start
+        else:
+            raise Exception('no such continuation parameter rule')
+        return epsilon,nu
+            
     class Factory:
         def create(self,ps_parameters,str_section):
             return MSIST(ps_parameters,str_section)
