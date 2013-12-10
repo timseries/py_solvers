@@ -19,7 +19,6 @@ class MSIST(Solver):
         """
         super(MSIST,self).__init__(ps_parameters,str_section)
         self.str_solver_variant = self.get_val('solvervariant',False)
-        
         self.str_variance_method = self.get_val('variance_method',False)
         self.alpha = None
         self.H = OperatorComp(ps_parameters,self.get_val('modalities',False))
@@ -36,31 +35,38 @@ class MSIST(Solver):
         super(MSIST,self).solve()
         H = self.H
         W = self.W
-
+        print 'test'
+        test = H * dict_in['x_0']
+        print 'test over'
         #input data 
         y_hat = dict_in['yhat']
-        x_n = dict_in['x_0']
+        x_n = dict_in['x_0'].copy()
+        dict_in['x_n'] = x_n
         #group structure
         if self.str_group_structure == 'self':
-            g_i = 1
+            g_i = 1.0
         elif self.str_group_structure == 'complexself':
-            g_i = 2
+            g_i = 2.0
         elif self.str_group_structure == 'parentchildren':
-            g_i = 2
+            g_i = 2.0
         elif self.str_group_structure == 'parentchild':
-            g_i = 2
+            g_i = 2.0
         elif self.str_group_structure == '':
-            g_i = 2
+            g_i = 2.0
         else:
             raise Exception("no such group structure " + self.str_group_structure)
         #input parameters and initialization
-        if self.alpha == 0: #alpha override wasn't supplied, so compute
+        if self.alpha.__class__.__name__ != 'ndarray':
             self.alpha = su.spectral_radius(self.W,self.H,dict_in['x_0'].shape)
-
+        alpha = self.alpha
         S_n = W * np.zeros(x_n.shape)
         w_n = W * x_n
+        dict_in['w_n'] = w_n
+
         if self.str_solver_variant == 'solvereal': #msist
-            epsilon,nu = get_nu_epsilon(self)
+            epsilon,nu = self.get_epsilon_nu()
+            dict_in['nu_sq'] = nu**2
+            dict_in['epsilon_sq'] = epsilon**2
         elif self.str_solver_variant == 'solvevbmm': #vbmm    
             p_a = dict_in['p_a']
             p_b_0 = dict_in['p_b_0']
@@ -72,28 +78,32 @@ class MSIST(Solver):
         else:
             raise Exception("no MSIST solver variant " + self.str_solver_variant)
         #begin iterations here
+        self.results.update(dict_in)
         for n in np.arange(self.int_iterations):
-            w_resid = W * ifftn(~H * ifftn(y_hat - H * x_n))
+            f_resid = ifftn(y_hat - H * x_n)
+            w_resid = W * ifftn(~H * f_resid)
             for s in arange(1,w_n.int_subbands):
                 #variance estimate
                 if self.str_solver_variant == 'solvereal': #msist
-                    S_n.set_subbands(s,1 / (1 / g_i * nabs(w_n.get_subband(s))**2 + epsilon[n]**2))
+                    S_n.set_subband(s,(1.0 / (1.0 / g_i * nabs(w_n.get_subband(s))**2 + epsilon[n]**2)))
                 elif self.str_solver_variant == 'solvevbmm': #vbmm    
-                    S_n.set_subband(s, (2 * p_a + g_i) / (2 * p_b + nabs(w_n.get_subband(s))**2))
+                    S_n.set_subband(s, (2.0 * p_a + g_i) / (2.0 * p_b + nabs(w_n.get_subband(s))**2))
                     b_n.set_subband(s, (p_k + p_a) / (p_theta + S_n.get_subband(s)))
+                else:
+                    raise Exception('no such solver variant')
                 #update current solution
                 w_n.set_subband(s, \
-                  (ary_alpha[s] * w_n.get_subband(s) + w_resid.get_subband(s)) / \
-                  (ary_alpha[s] + (nu[n]**2) * S_n.get_subbands(s)))
-                #update results
-                self.results.update(dict_in,x_n,w_n)
-            x_n = ~W * w_n
+                  (alpha[s] * w_n.get_subband(s) + w_resid.get_subband(s)) / \
+                  (alpha[s] + (nu[n]**2) * S_n.get_subband(s)))
+            x_n = (~W) * w_n
             w_n = W * x_n #reprojection, to put our iterate in the range space, prevent drifting
-        dict_in['x_n'] = x_n
-        dict_in['w_n'] = w_n
+            dict_in['x_n'] = x_n
+            dict_in['w_n'] = w_n
+            #update results
+            self.results.update(dict_in)
         return dict_in
 
-    def get_nu_epsilon(self):
+    def get_epsilon_nu(self):
         '''
         A method for generating the sequences of nu and epsilon using some continuation rule.
         '''
