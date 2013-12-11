@@ -2,8 +2,8 @@
 import numpy as np
 from numpy import arange, conj
 from numpy.fft import fftn, ifftn
-from numpy import abs as nabs, exp, max as nmax
-from py_utils.signal_utilities import ws as ws
+from numpy import abs as nabs, exp, maximum as nmax
+from py_utils.signal_utilities.ws import WS
 import py_utils.signal_utilities.sig_utils as su
 from py_solvers.solver import Solver
 from py_operators.operator import Operator
@@ -35,9 +35,6 @@ class MSIST(Solver):
         super(MSIST,self).solve()
         H = self.H
         W = self.W
-        print 'test'
-        test = H * dict_in['x_0']
-        print 'test over'
         #input data 
         y_hat = dict_in['yhat']
         x_n = dict_in['x_0'].copy()
@@ -59,8 +56,8 @@ class MSIST(Solver):
         if self.alpha.__class__.__name__ != 'ndarray':
             self.alpha = su.spectral_radius(self.W,self.H,dict_in['x_0'].shape)
         alpha = self.alpha
-        S_n = W * np.zeros(x_n.shape)
         w_n = W * x_n
+        S_n = WS(np.zeros(w_n.ary_scaling.shape),(w_n.one_subband(0)).tup_coeffs) #initialize the variance matrix as a ws object
         dict_in['w_n'] = w_n
 
         if self.str_solver_variant == 'solvereal': #msist
@@ -68,13 +65,15 @@ class MSIST(Solver):
             dict_in['nu_sq'] = nu**2
             dict_in['epsilon_sq'] = epsilon**2
         elif self.str_solver_variant == 'solvevbmm': #vbmm    
-            p_a = dict_in['p_a']
-            p_b_0 = dict_in['p_b_0']
-            p_k = dict_in['p_k']
-            p_theta = dict_in['p_theta']
-            b_n = W * x_n
-            for s in arange(ws_resid.int_subbands):
-                b_n.set_subbands(s, p_b_0)
+            nu = self.get_val('nustart',True) * np.ones(self.int_iterations,)
+            dict_in['nu_sq'] = nu**2
+            p_a = self.get_val('p_a',True)
+            p_b_0 = self.get_val('p_b_0',True)
+            p_k = self.get_val('p_k',True)
+            p_theta = self.get_val('p_theta',True)
+            b_n = WS(np.zeros(w_n.ary_scaling.shape),(w_n.one_subband(0)).tup_coeffs)
+            for s in arange(w_n.int_subbands):
+                b_n.set_subband(s, p_b_0)
         else:
             raise Exception("no MSIST solver variant " + self.str_solver_variant)
         #begin iterations here
@@ -85,17 +84,21 @@ class MSIST(Solver):
             for s in arange(1,w_n.int_subbands):
                 #variance estimate
                 if self.str_solver_variant == 'solvereal': #msist
-                    S_n.set_subband(s,(1.0 / (1.0 / g_i * nabs(w_n.get_subband(s))**2 + epsilon[n]**2)))
+                    S_n.set_subband(s,(1.0 / ((1.0 / g_i) * nabs(w_n.get_subband(s))**2 + epsilon[n]**2)))
                 elif self.str_solver_variant == 'solvevbmm': #vbmm    
-                    S_n.set_subband(s, (2.0 * p_a + g_i) / (2.0 * p_b + nabs(w_n.get_subband(s))**2))
-                    b_n.set_subband(s, (p_k + p_a) / (p_theta + S_n.get_subband(s)))
+                    if n == 0:
+                        sigma = 0
+                    else:
+                        sigma = (1.0 / nu[n]**2 * alpha[s] + S_n.get_subband(s))**(-1)
+                    S_n.set_subband(s, (g_i + 2.0 * p_a) / (nabs(w_n.get_subband(s))**2 + sigma + 2.0 * b_n.get_subband(s)))
+                    b_n.set_subband(s, (p_k + p_a) / (S_n.get_subband(s) + p_theta))
                 else:
                     raise Exception('no such solver variant')
                 #update current solution
                 w_n.set_subband(s, \
                   (alpha[s] * w_n.get_subband(s) + w_resid.get_subband(s)) / \
                   (alpha[s] + (nu[n]**2) * S_n.get_subband(s)))
-            x_n = (~W) * w_n
+            x_n = ~W * w_n
             w_n = W * x_n #reprojection, to put our iterate in the range space, prevent drifting
             dict_in['x_n'] = x_n
             dict_in['w_n'] = w_n
@@ -123,7 +126,7 @@ class MSIST(Solver):
                                   for i in arange(self.int_iterations)])
             nu = np.asarray([nu_start * exp(-i / decay) + nu_stop \
                                   for i in arange(self.int_iterations)])
-        elif str_method == 'fixed':    
+        elif str_method == 'fixed':
             epsilon = epsilon_start
             nu = nu_start
         else:
