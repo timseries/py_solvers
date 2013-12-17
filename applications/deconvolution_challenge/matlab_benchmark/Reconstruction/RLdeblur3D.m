@@ -105,9 +105,11 @@ for i=1:iter
       if isempty(L)
         L=max(img(:))-min(img(:));
       end
+
 	  xreg = AffineRegression(x0, img);
       QS.ISNR(i)=20*log10(norm(y(:)-img(:))/norm(x0(:)-img(:)));
       QS.RSNR(i)=20*log10(norm(y(:)-img(:))/norm(xreg(:)-img(:)));
+      QS.RSNR(i)=0;
       if isempty(imgb)
         QS.nmise_metric(i)=nan;
       else

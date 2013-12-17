@@ -9,7 +9,7 @@ from py_utils.section_factory import SectionFactory as sf
 
 def main():
     #configuration specification, absolute path
-    ps_path='/home/tim/repos/py_solvers/deconvolution_challenge/training.ini'
+    ps_path='/home/tim/repos/py_solvers/applications/deconvolution_challenge/p0.ini'
     ps_params = ParameterStruct(ps_path)
     dict_in = {}
     sec_input = sf.create_section(ps_params,'Input1')
@@ -20,8 +20,8 @@ def main():
     #read, preprocess, observe, solve, report
     sec_input.read(dict_in)
     sec_observe.observe(dict_in)
-    so_solver.solve(dict_in)
-    so_solver.results.display()
+    #so_solver.solve(dict_in)
+    #so_solver.results.display()
     
 if __name__ == "__main__":
     main()

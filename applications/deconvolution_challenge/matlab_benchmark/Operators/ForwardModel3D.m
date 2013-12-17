@@ -68,4 +68,4 @@ end
 fb=r+b;
 f=Crop(f,r);
 
-y=uint16(poissrnd(fb)+w);
+y=int16(poissrnd(fb)+w);
