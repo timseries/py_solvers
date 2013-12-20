@@ -2,6 +2,7 @@ function f = Adjoint(h, g)
 	K = size(h);
 	L = size(g);
 	N = min(L+K-1, 2*L-1);
+        
 	f = zeros(N);
 	v = colonvec(N-L+1, N);
 	f(v{:}) = g;

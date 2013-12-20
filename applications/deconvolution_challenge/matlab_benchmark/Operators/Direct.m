@@ -9,5 +9,8 @@ function g = Direct(h, f)
 	g = ifftn(fftn(h, M+L) .* fftn(f, M+L));
 % 	toc();
 	v = colonvec(m, M);
+%        v{1}
+%        v{2}
+%        v{3}
 	g = g(v{:});
 end

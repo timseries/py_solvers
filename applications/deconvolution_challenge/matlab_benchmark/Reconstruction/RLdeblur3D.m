@@ -67,6 +67,7 @@ AdjBop = @(y) Adjoint(h, y); % Function handle that corresponds to the adjoint o
 if isempty(x_init)
     x_init=Adjoint(h, y);
 end
+size(x_init)
 x=x_init;
 
 % Normalization constant
@@ -83,7 +84,6 @@ if verbose
   fprintf('==========================================================================================\n');
 end
 for i=1:iter
-  
   div=y./(Bop(x)+b);
   div(isnan(div))=0;
   xnew=AdjBop(div).*x;
