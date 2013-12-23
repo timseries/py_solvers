@@ -13,7 +13,7 @@ class Solver(Section):
         """       
         super(Solver,self).__init__(ps_parameters,str_section)
         self.int_iterations = self.get_val('nitn',True)
-        self.results = sf.create_section(ps_parameters,self.get_val('results',False))    
+        self.results = sf.create_section(ps_parameters,self.get_val('results',False))
         
     def solve(self):
-        self.results.clear() #start fresh
+        self.results.clear() #start fresh by running this first in any solver

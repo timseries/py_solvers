@@ -18,6 +18,7 @@ function metric = FourierMetricsConstructor(N, K)
 		n{d} = ifftshift(floor(-(N(d)-1)/2):floor((N(d)-1)/2));
 	end
 	[x{1:D}] = ndgrid(n{:});
+        [x{1:D}]
 	r = 0;
 	for d = 1:D
 		r = r + (2*x{d}/N(d)).^2;
