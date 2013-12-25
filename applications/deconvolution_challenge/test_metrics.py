@@ -20,8 +20,6 @@ def main():
     sec_observe = sf.create_section(ps_params,'Observe1')
     sec_observe.observe(dict_in)
     #now remove the extra padding from x
-    dict_in['x'] = crop(dict_in['x'],dict_in['y'].shape)
-    dict_in['x_f'] = fftn(dict_in['x'])
     results = sf.create_section(ps_params,'Results1')
     results.update(dict_in)
     

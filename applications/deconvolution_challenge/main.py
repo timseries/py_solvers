@@ -20,8 +20,8 @@ def main():
     #read, preprocess, observe, solve, report
     sec_input.read(dict_in)
     sec_observe.observe(dict_in)
-    #so_solver.solve(dict_in)
-    #so_solver.results.display()
+    so_solver.solve(dict_in)
+    so_solver.results.display()
     
 if __name__ == "__main__":
     main()
