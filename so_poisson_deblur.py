@@ -8,6 +8,8 @@ import py_utils.signal_utilities.sig_utils as su
 from py_solvers.solver import Solver
 from py_operators.operator import Operator
 from py_operators.operator_comp import OperatorComp
+from scipy.optimize import fmin_ncg as ncg
+from numpy.linalg import norm
 
 class PoissonDeblur(Solver):
     """
@@ -36,7 +38,8 @@ class PoissonDeblur(Solver):
         #input data 
         x_n = dict_in['x_0'].copy()
         b = dict_in['b']#background
-        dict_in['x_n'] = x_n
+        sigma = dict_in['noisevariance']
+        dict_in['x_n']  = x_n
         #group structure
         if self.str_group_structure == 'self':
             g_i = 1.0
@@ -61,30 +64,22 @@ class PoissonDeblur(Solver):
         dict_in['nu_sq'] = nu**2
         dict_in['epsilon_sq'] = epsilon**2
         #begin iterations here
-        self.results.update(dict_in)
         for n in np.arange(self.int_iterations):
-            f_2 = H * x_n + b
-            f_1 = f_2 + 3/8
-            u = 2 * sqrt(f_1) - 1 / (4 * sqrt(f_2))
-            u_sq = u**2
-            u_sq_f_1 = np.dot(u_sq.flatten(),f_1.flatten())
-            u_sq_f_2 = np.dot(u_sq.flatten(),f_2.flatten())
-
-            f_resid = -u_sq/sqrt(u_sq_f_1) + sqrt(u_sq_f_2)/(4*f_2) \
-              - u_sq/(8*f_2*sqrt(u_sq_f_2)) + 2*ones(u_sq_f_2.shape) - sqrt(2*f_2/f_1)*((f_1-f_2)/f_2**2) \
-              - 1/(16*f_2**2)
-            w_n = ~H * f_resid
-            w_n = W * w_n
+            #update S
             for s in arange(1,w_n.int_subbands):
-                #variance estimate
                 S_n.set_subband(s,(1.0 / ((1.0 / g_i) * nabs(w_n.get_subband(s))**2 + epsilon[n]**2)))
-                #update current solution
-                w_n.set_subband(s, w_n.get_subband(s)/S_n.get_subband(s))
+                S_n.flatten(thresh=True)
+            #update q
+            q_n = (dict_in['y'] / sigma + self.u(w_n,b)) / (1/sigma + 1)
+            #update w
+            w_n.flatten()
+            w_n.ws_vector = ncg(self.F,w_n.ws_vector,self.F_prime,None,args=(w_n,q_n,b,S_n.ws_vector), maxiter=5)
+            w_n.unflatten()
             x_n = ~W * w_n
             w_n = W * x_n #reprojection, to put our iterate in the range space, prevent drifting
             dict_in['x_n'] = x_n
             dict_in['w_n'] = w_n
-            #update results
+
             self.results.update(dict_in)
         return dict_in
 
@@ -109,11 +104,148 @@ class PoissonDeblur(Solver):
             nu = np.asarray([nu_start * exp(-i / decay) + nu_stop \
                                   for i in arange(self.int_iterations)])
         elif str_method == 'fixed':
-            epsilon = epsilon_start
-            nu = nu_start
+            epsilon = np.ones(self.int_iterations)*epsilon_start
+            nu = np.ones(self.int_iterations)*nu_start
         else:
             raise Exception('no such continuation parameter rule')
         return epsilon,nu
+            
+    def F(self, w, *args):
+        '''
+        The function of the wavelet coefficients we wish to minimze in order to iterate our solution 
+        using Newton/Secant/Halley's method. w is a ndarray
+        '''
+        ws = args[0]
+        q =  args[1]
+        b =  args[2]
+        S =  args[3]
+        ws.ws_vector = w
+        ws.unflatten()
+        u = self.u(ws,b)
+        print 'ndim u: ' + str(u.ndim)
+        print 'ndim q: ' + str(q.ndim)
+        w_threshold = norm(u.flatten()-q.flatten(),ord=2)**2
+        w_threshold = w_threshold + np.dot(S,w**2)
+        #for s in arange(1,w_threshold.int_subbands):
+        #    w_threshold.set_subband(w_threshold.get_subband(s) + S.get_subband(s))
+
+        return w_threshold / 2.0
+    
+    def F_prime(self, w, *args):
+        '''
+        The function of the wavelet coefficients we wish to minimze in order to iterate our solution 
+        using Newton/Secant/Halley's method. w is a ndarray
+        '''
+        ws = args[0]
+        q =  args[1]
+        b =  args[2]
+        S =  args[3]
+        ws.ws_vector = w
+        ws.unflatten()
+        u = self.u(ws,b)
+        u_prime = self.u_prime(ws,b)
+        w_threshold = (self.W * ifftn(~self.H * (u_prime * (u - q))))
+        w_threshold.flatten()
+        w_threshold = w_threshold.ws_vector + S*w
+        #for s in arange(1,w_threshold.int_subbands):
+        #    w_threshold.set_subband(w_threshold.get_subband(s) + S.get_subband(s))
+
+        return w_threshold / 2.0
+
+    def F_prime_old(self, w, *args):
+        '''
+        Derivative of F
+        '''
+        ws = args[0]
+        q = args[1]
+        b = args[2] 
+        S = args[3]
+        ws.ws_vector = w
+        ws.unflatten()
+        u_prime = self.u_prime(ws,b)
+        u_prime_prime = self.u_prime_prime(ws,b)
+        u = self.u(ws,b)
+        w_threshold = self.W * ifftn(~self.H * (u_prime**2 + u_prime_prime*(u-q)))
+        w_threshold.flatten()
+        w_vector = w_threshold.ws_vector + S
+        #for s in arange(1,w_threshold.int_subbands):
+        #    w_threshold.set_subband(w_threshold.get_subband(s)+S.get_subband(s))
+        return 1 / 2.0 * w_vector
+    
+    def f(self, ws, b):
+        '''
+        Returns the Anscombe transformation of the linear blurring equation 2*sqrt(AW^Tw+b)
+        '''
+        b1 = b + 3 / 8.0      
+        return 2*sqrt(ifftn(self.H * (~self.W * ws)) + b1)
+
+    def f_prime(self, ws, b):
+        '''
+        The derivative of f(.)
+        '''
+        return 1 / (2 * self.f(ws,b))
+
+    def u(self, ws, b):
+        ''' 
+        Returns the mean of the Anscombe-transformed Poisson random variable
+        '''
+        f = self.f(ws,b)
+        return f - 1 / (2 * f)
+
+    def u_prime(self, ws, b): 
+        ''' 
+        Returns the derivative of the mean of the Anscombe-transformed Poisson random variable
+        '''
+        f = self.f(ws,b)
+        return (2 / f + 1 / (f**3))
+
+    def u_prime_prime(self, ws, b):
+        ''' 
+        Derivative of u_prime
+        '''
+        f = self.f(ws,b)
+        return -4 / f**3 - 6/f**5
+
+    def old_school_solver():        
+        for n in np.arange(self.int_iterations):
+            f_2 = ifftn(H * x_n).real + b
+            f_1 = f_2 + 3/8.0
+            print 'f1 and f2 min...'
+            print f_1.min()
+            print f_2.min()
+            print 'f1 and f2 max...'
+            print f_1.max()
+            print f_2.max()
+            u = 2 * sqrt(f_1) - 1 / (4 * sqrt(f_2))
+            u_sq = u**2
+            print 'u_sq max...'
+            print u_sq.max()
+
+            u_sq_f_1 = sqrt(np.sum(u_sq * f_1))
+            u_sq_f_2 = sqrt(np.sum(u_sq * f_2))
+            print 'u_sq_f_1 max...'
+            print u_sq_f_1
+
+            f_resid = (-u_sq/u_sq_f_1 + u_sq_f_2/(4*f_2**2) \
+              - u_sq/(8*f_2*u_sq_f_2) + 4*ones(u_sq_f_2.shape) \
+              - 1/(16*f_2))
+            print 'f_resid max/min...'
+            print f_resid.max()
+            print f_resid.min()
+            w_n = ifftn(~H * f_resid).real
+            print 'w_n max/min...'
+            print w_n.max()
+            print w_n.min()
+            w_n = W * w_n
+            for s in arange(1,w_n.int_subbands):
+                #variance estimate
+                S_n.set_subband(s,(1.0 / ((1.0 / g_i) * nabs(w_n.get_subband(s))**2 + epsilon[n]**2)))
+                #update current solution
+                w_n.set_subband(s, w_n.get_subband(s)/S_n.get_subband(s))
+            x_n = ~W * w_n
+            w_n = W * x_n #reprojection, to put our iterate in the range space, prevent drifting
+            dict_in['x_n'] = x_n
+            dict_in['w_n'] = w_n
             
     class Factory:
         def create(self,ps_parameters,str_section):
