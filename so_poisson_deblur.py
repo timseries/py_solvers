@@ -8,8 +8,11 @@ import py_utils.signal_utilities.sig_utils as su
 from py_solvers.solver import Solver
 from py_operators.operator import Operator
 from py_operators.operator_comp import OperatorComp
-from scipy.optimize import fmin_ncg as ncg
+from scipy.optimize import fmin_cg as ncg
 from numpy.linalg import norm
+#profiling and debugging stuff
+from py_utils.timer import Timer
+import pdb
 
 class PoissonDeblur(Solver):
     """
@@ -26,7 +29,6 @@ class PoissonDeblur(Solver):
         self.W = self.W.ls_operators[0] #assume we just have one transform
         self.alpha = self.get_val('alpha',True)
         self.str_group_structure = self.get_val('grouptypes',False)
-
     def solve(self,dict_in):
         """
         Takes an input object (ground truth, forward model observation, metrics required)
@@ -38,7 +40,7 @@ class PoissonDeblur(Solver):
         #input data 
         x_n = dict_in['x_0'].copy()
         b = dict_in['b']#background
-        sigma = dict_in['noisevariance']
+        sigma_sq = dict_in['noisevariance']
         dict_in['x_n']  = x_n
         #group structure
         if self.str_group_structure == 'self':
@@ -57,7 +59,9 @@ class PoissonDeblur(Solver):
         if self.alpha.__class__.__name__ != 'ndarray':
             self.alpha = su.spectral_radius(self.W,self.H,dict_in['x_0'].shape)
         alpha = self.alpha
-        w_n = W * x_n
+        with Timer() as t:
+            w_n = W * x_n
+        print '-> elapsed wavelet transform: %s s' % t.secs    
         S_n = WS(np.zeros(w_n.ary_scaling.shape),(w_n.one_subband(0)).tup_coeffs) #initialize the variance matrix as a ws object
         dict_in['w_n'] = w_n
         epsilon,nu = self.get_epsilon_nu()
@@ -73,7 +77,7 @@ class PoissonDeblur(Solver):
             q_n = (dict_in['y'] / nu[n]**2 + self.u(w_n,b)) / (1 / nu[n]**2 + 1)
             #update w
             w_n.flatten()
-            w_n.ws_vector = ncg(self.F,w_n.ws_vector,self.F_prime,None,args=(w_n,q_n,b,S_n.ws_vector), maxiter=5)
+            w_n.ws_vector = ncg(self.F,w_n.ws_vector,self.F_prime,None,args=(w_n,q_n,b,S_n.ws_vector), maxiter=4)
             w_n.unflatten()
             x_n = ~W * w_n
             w_n = W * x_n #reprojection, to put our iterate in the range space, prevent drifting
@@ -131,8 +135,7 @@ class PoissonDeblur(Solver):
     
     def F_prime(self, w, *args):
         '''
-        The function of the wavelet coefficients we wish to minimze in order to iterate our solution 
-        using Newton/Secant/Halley's method. w is a ndarray
+        Derivative of F
         '''
         ws = args[0]
         q =  args[1]
@@ -150,9 +153,9 @@ class PoissonDeblur(Solver):
 
         return w_threshold / 2.0
 
-    def F_prime_old(self, w, *args):
+    def F_prime_prime(self, w, *args):
         '''
-        Derivative of F
+        Derivative of F_prime
         '''
         ws = args[0]
         q = args[1]
