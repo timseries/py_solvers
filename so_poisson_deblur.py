@@ -69,8 +69,8 @@ class PoissonDeblur(Solver):
             for s in arange(1,w_n.int_subbands):
                 S_n.set_subband(s,(1.0 / ((1.0 / g_i) * nabs(w_n.get_subband(s))**2 + epsilon[n]**2)))
                 S_n.flatten(thresh=True)
-            #update q
-            q_n = (dict_in['y'] / sigma + self.u(w_n,b)) / (1/sigma + 1)
+            #update q, use iether sigma**2 or nu**2 (an estimate for sigma**2)
+            q_n = (dict_in['y'] / nu[n]**2 + self.u(w_n,b)) / (1 / nu[n]**2 + 1)
             #update w
             w_n.flatten()
             w_n.ws_vector = ncg(self.F,w_n.ws_vector,self.F_prime,None,args=(w_n,q_n,b,S_n.ws_vector), maxiter=5)
@@ -122,8 +122,6 @@ class PoissonDeblur(Solver):
         ws.ws_vector = w
         ws.unflatten()
         u = self.u(ws,b)
-        print 'ndim u: ' + str(u.ndim)
-        print 'ndim q: ' + str(q.ndim)
         w_threshold = norm(u.flatten()-q.flatten(),ord=2)**2
         w_threshold = w_threshold + np.dot(S,w**2)
         #for s in arange(1,w_threshold.int_subbands):
