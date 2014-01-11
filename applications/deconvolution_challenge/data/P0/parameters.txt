@@ -1,5 +1,0 @@
-Parameters used in forward model
-mp = 239.6;
-b = 15.8;
-stdev = 9.7;
-seed = 1;
