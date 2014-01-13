@@ -1,14 +1,13 @@
 #!/usr/bin/python -tt
 import numpy as np
 from numpy import arange, conj, sqrt, ones
-from numpy.fft import fftn, ifftn
 from numpy import abs as nabs, exp, maximum as nmax
 from py_utils.signal_utilities.ws import WS
 import py_utils.signal_utilities.sig_utils as su
 from py_solvers.solver import Solver
 from py_operators.operator import Operator
 from py_operators.operator_comp import OperatorComp
-from scipy.optimize import fmin_cg as ncg
+from scipy.optimize import fmin_ncg as ncg
 from numpy.linalg import norm
 #profiling and debugging stuff
 from py_utils.timer import Timer
@@ -77,7 +76,8 @@ class PoissonDeblur(Solver):
             q_n = (dict_in['y'] / nu[n]**2 + self.u(w_n,b)) / (1 / nu[n]**2 + 1)
             #update w
             w_n.flatten()
-            w_n.ws_vector = ncg(self.F,w_n.ws_vector,self.F_prime,None,args=(w_n,q_n,b,S_n.ws_vector), maxiter=4)
+            w_n.ws_vector = ncg(f=self.F,x0=w_n.ws_vector,fprime=self.F_prime,fhess=None,args=(w_n,q_n,b,S_n.ws_vector),epsilon=1.5E-6, maxiter=5)
+            #w_n.ws_vector = ncg(f=self.F,x0=w_n.ws_vector,fprime=self.F_prime,args=(w_n,q_n,b,S_n.ws_vector),gtol=1e-2, maxiter=4,retall=0)
             w_n.unflatten()
             x_n = ~W * w_n
             w_n = W * x_n #reprojection, to put our iterate in the range space, prevent drifting
@@ -126,7 +126,9 @@ class PoissonDeblur(Solver):
         ws.ws_vector = w
         ws.unflatten()
         u = self.u(ws,b)
-        w_threshold = norm(u.flatten()-q.flatten(),ord=2)**2
+        with Timer() as t:
+            w_threshold = norm(u.flatten()-q.flatten(),ord=2)**2
+        print '-> elapsed function time: dtcwt time): %s s' % t.secs    
         w_threshold = w_threshold + np.dot(S,w**2)
         #for s in arange(1,w_threshold.int_subbands):
         #    w_threshold.set_subband(w_threshold.get_subband(s) + S.get_subband(s))
@@ -145,7 +147,9 @@ class PoissonDeblur(Solver):
         ws.unflatten()
         u = self.u(ws,b)
         u_prime = self.u_prime(ws,b)
-        w_threshold = (self.W * ifftn(~self.H * (u_prime * (u - q))))
+        with Timer() as t:
+            w_threshold = self.W * (~self.H * (u_prime * (u - q)))
+        print '-> elapsed gradient time: dtcwt time): %s s' % t.secs    
         w_threshold.flatten()
         w_threshold = w_threshold.ws_vector + S*w
         #for s in arange(1,w_threshold.int_subbands):
@@ -166,7 +170,7 @@ class PoissonDeblur(Solver):
         u_prime = self.u_prime(ws,b)
         u_prime_prime = self.u_prime_prime(ws,b)
         u = self.u(ws,b)
-        w_threshold = self.W * ifftn(~self.H * (u_prime**2 + u_prime_prime*(u-q)))
+        w_threshold = self.W * (~self.H * (u_prime**2 + u_prime_prime*(u-q)))
         w_threshold.flatten()
         w_vector = w_threshold.ws_vector + S
         #for s in arange(1,w_threshold.int_subbands):
@@ -178,7 +182,7 @@ class PoissonDeblur(Solver):
         Returns the Anscombe transformation of the linear blurring equation 2*sqrt(AW^Tw+b)
         '''
         b1 = b + 3 / 8.0      
-        return 2*sqrt(ifftn(self.H * (~self.W * ws)) + b1)
+        return 2*sqrt(self.H * (~self.W * ws) + b1)
 
     def f_prime(self, ws, b):
         '''
