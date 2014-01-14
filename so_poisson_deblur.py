@@ -55,9 +55,9 @@ class PoissonDeblur(Solver):
         else:
             raise Exception("no such group structure " + self.str_group_structure)
         #input parameters and initialization
-        if self.alpha.__class__.__name__ != 'ndarray':
-            self.alpha = su.spectral_radius(self.W,self.H,dict_in['x_0'].shape)
-        alpha = self.alpha
+        #if self.alpha.__class__.__name__ != 'ndarray':
+        #    self.alpha = su.spectral_radius(self.W,self.H,dict_in['x_0'].shape)
+        #alpha = self.alpha
         with Timer() as t:
             w_n = W * x_n
         print '-> elapsed wavelet transform: %s s' % t.secs    
@@ -67,6 +67,7 @@ class PoissonDeblur(Solver):
         dict_in['nu_sq'] = nu**2
         dict_in['epsilon_sq'] = epsilon**2
         #begin iterations here
+        self.results.update(dict_in)
         for n in np.arange(self.int_iterations):
             #update S
             for s in arange(1,w_n.int_subbands):
@@ -76,8 +77,9 @@ class PoissonDeblur(Solver):
             q_n = (dict_in['y'] / nu[n]**2 + self.u(w_n,b)) / (1 / nu[n]**2 + 1)
             #update w
             w_n.flatten()
-            w_n.ws_vector = ncg(f=self.F,x0=w_n.ws_vector,fprime=self.F_prime,fhess=None,args=(w_n,q_n,b,S_n.ws_vector),epsilon=1.5E-6, maxiter=5)
-            #w_n.ws_vector = ncg(f=self.F,x0=w_n.ws_vector,fprime=self.F_prime,args=(w_n,q_n,b,S_n.ws_vector),gtol=1e-2, maxiter=4,retall=0)
+            w_n.ws_vector = ncg(f=self.F,x0=w_n.ws_vector,fprime=self.F_prime,fhess=None,args=(w_n,q_n,b,S_n.ws_vector), avextol=1e-2, epsilon=1e-02, maxiter=4,retall=0)
+            #w_n.ws_vector = ncg(f=self.F,x0=w_n.ws_vector,fprime=self.F_prime,args=(w_n,q_n,b,S_n.ws_vector), gtol=1e-02, maxiter=4,retall=0)
+
             w_n.unflatten()
             x_n = ~W * w_n
             w_n = W * x_n #reprojection, to put our iterate in the range space, prevent drifting
@@ -126,9 +128,9 @@ class PoissonDeblur(Solver):
         ws.ws_vector = w
         ws.unflatten()
         u = self.u(ws,b)
-        with Timer() as t:
-            w_threshold = norm(u.flatten()-q.flatten(),ord=2)**2
-        print '-> elapsed function time: dtcwt time): %s s' % t.secs    
+        #with Timer() as t:
+        w_threshold = norm(u.flatten()-q.flatten(),ord=2)**2
+            #print '-> elapsed function time: dtcwt time): %s s' % t.secs    
         w_threshold = w_threshold + np.dot(S,w**2)
         #for s in arange(1,w_threshold.int_subbands):
         #    w_threshold.set_subband(w_threshold.get_subband(s) + S.get_subband(s))
@@ -147,10 +149,13 @@ class PoissonDeblur(Solver):
         ws.unflatten()
         u = self.u(ws,b)
         u_prime = self.u_prime(ws,b)
-        with Timer() as t:
-            w_threshold = self.W * (~self.H * (u_prime * (u - q)))
-        print '-> elapsed gradient time: dtcwt time): %s s' % t.secs    
+
+        #with Timer() as t:
+        w_threshold = self.W * (~self.H * (u_prime * (u - q)))
+
+        #print '-> elapsed gradient time: dtcwt time): %s s' % t.secs    
         w_threshold.flatten()
+        print 'min of wthresh in F_prime: ' + str(np.mean(w_threshold.ws_vector))
         w_threshold = w_threshold.ws_vector + S*w
         #for s in arange(1,w_threshold.int_subbands):
         #    w_threshold.set_subband(w_threshold.get_subband(s) + S.get_subband(s))
@@ -182,34 +187,35 @@ class PoissonDeblur(Solver):
         Returns the Anscombe transformation of the linear blurring equation 2*sqrt(AW^Tw+b)
         '''
         b1 = b + 3 / 8.0      
-        return 2*sqrt(self.H * (~self.W * ws) + b1)
+        return 2.0*sqrt(self.H * (~self.W * ws) + b1)
 
     def f_prime(self, ws, b):
         '''
         The derivative of f(.)
         '''
-        return 1 / (2 * self.f(ws,b))
+        f = self.f(ws,b)
+        return 1.0 / (2.0 * f)
 
     def u(self, ws, b):
         ''' 
         Returns the mean of the Anscombe-transformed Poisson random variable
         '''
         f = self.f(ws,b)
-        return f - 1 / (2 * f)
+        return f - 1.0 / (2.0 * f)
 
     def u_prime(self, ws, b): 
         ''' 
         Returns the derivative of the mean of the Anscombe-transformed Poisson random variable
         '''
         f = self.f(ws,b)
-        return (2 / f + 1 / (f**3))
+        return (2.0 / f + 1.0 / (f**3))
 
     def u_prime_prime(self, ws, b):
         ''' 
         Derivative of u_prime
         '''
         f = self.f(ws,b)
-        return -4 / f**3 - 6/f**5
+        return -4.0 / f**3 - 6.0 /f**5
 
     def old_school_solver():        
         for n in np.arange(self.int_iterations):
