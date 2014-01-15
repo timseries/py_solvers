@@ -1,4 +1,6 @@
 function [x0,fun_val,QS]=sparse_poisson_deblur(y,h,varargin)
+import mat_operators.*;
+import mat_utils.*;
 
 %Image deblurring with Richardson-Lucy algorithm.
 
@@ -36,10 +38,10 @@ function [x0,fun_val,QS]=sparse_poisson_deblur(y,h,varargin)
 
 %Author: stamatis.lefkimmiatis@epfl.ch (Biomedical Imaging Group)
 
-[x_init,iter,verbose,showfig,tol,img,imgb,b,K,window,L,ismetric]=...
+[x_init,iter,verbose,showfig,tol,img,imgb,b,K,window,L,ismetric,nu,epsilon,decay,W]=...
   process_options(varargin,'x_init',[],'iter',100,'verbose',true,...
   'showfig',false,'tol',1e-5,'img',[],'imgb',[],'b',0,'K',[0.01 0.03],...
-  'window', fspecial('gaussian', 11, 1.5),'L',[],'ismetric',false);
+  'window', fspecial('gaussian', 11, 1.5),'L',[],'ismetric',false,'nu',[],'epsilon',[],'decay',[],'W',[]);
 
 
 if nargout > 2 && ismetric
@@ -66,11 +68,24 @@ AdjBop = @(y) Adjoint(h, y); % Function handle that corresponds to the adjoint o
 %x0 Initialization
 if isempty(x_init)
     x_init=Adjoint(h, y);
+    
 end
 size(x_init)
 x=x_init;
 
-% Normalization constant
+%stuff for nonlinear solver, won't change from iteration to the next
+pars.b = b;
+pars.h = h;
+pars.W = W;
+pars.epsilon = epsilon;
+pars.w_n = W * x;
+pars.nvar = pars.w_n.getNumCoeffs();
+pars.fgname = 'fungrad';
+options.maxit=10;
+options.version='C';
+options.prtlevel=1;
+
+% Normalization constant, probably won't need this
 gamma = AdjBop(ones(size(y)));
 
 fun_val=zeros(iter,1);
@@ -83,20 +98,18 @@ if verbose
   fprintf('#iter       fun-val      relative-dif     ISNR\t  RSNR\t   NMISE\t  SSIM_mean\t   SSIM_min\n')
   fprintf('==========================================================================================\n');
 end
-   S_n=cell(w.J,1);
+
 
 for i=1:iter
-  q = (y/nu^2 + u(w_n,b)) / (1 / nu^2 + 1)
-  pars.b = b;
+  q = (y/nu^2 + u(pars.w_n,b,h,W)) / (1 / nu^2 + 1);
   pars.q = q;
-  pars.h = h;
-  pars.W = W;
-  pars.w_n = w_n;
-  pars.epsilon = epsilon;
   [wvec_n, f, g, frec, alpharec] = nlcg(pars, options)
+  pars.w_n.setSubbandsArray(wvec_n);
+  xnew = W' * pars.w_n;
+  wvec_n = pars.w_n.getSubbandsArray(1:pars.w_n,1)
 %fun_val(i)=cost(y,Bop,xnew,b);
      
-   re=norm(xnew(:)-x(:))/norm(x(:));%relative error
+  re=norm(xnew(:)-x(:))/norm(x(:));%relative error
   if (re < tol)
     count=count+1;
   else
@@ -176,16 +189,16 @@ function res=f(w_n,b,h,W)
     b1 = b + 3 / 8;
     res = 2*sqrt(Direct(h,(W'*w_n))+b1);
     
-function [val,grad] = fungrad(wvec_n, pars)
-    pars.w_n.setSubbandsArray(wvec_n);
-    u = u(pars.w_n,pars.b,pars.h,pars.W);
-    u_prime = u_prime(pars.w_n,pars.b,pars.h,pars.W);
-%compute S here
-    S=S(wvec_n,pars.epsilon);
-%yield fn val
-    val = (norm(u(:)-pars.q(:),2)^2 + (wvec_n.^2).*S)/2;
-    gradw = pars.W * Adjoint(pars.h, (u_prime.*(u-pars.q)));
-    grad = gradw.getSubbandsArray() + wvec_n.*S;
+%function [val,grad] = fungrad(wvec_n, pars)
+%    pars.w_n.setSubbandsArray(wvec_n,1:pars.w_n.J,1);
+%    u = u(pars.w_n,pars.b,pars.h,pars.W);
+%    u_prime = u_prime(pars.w_n,pars.b,pars.h,pars.W);
+%%compute S here
+%    S=S(wvec_n,pars.epsilon);
+%%yield fn val
+%    val = (norm(u(:)-pars.q(:),2)^2 + (wvec_n.^2).*S)/2;
+%    gradw = pars.W * Adjoint(pars.h, (u_prime.*(u-pars.q)));
+%    grad = gradw.getSubbandsArray() + wvec_n.*S;
     
 function res = S(wvec_n,epsilon)
     res = .5/(wvec_n.^2+epsilon^2)
