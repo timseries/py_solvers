@@ -5,14 +5,14 @@ addpath(['/home/tim/repos/py_solvers/applications/deconvolution_challenge/matlab
 addpath(['/home/tim/repos/py_solvers/applications/deconvolution_challenge/matlab_benchmark/Metrics/FourierMetrics'])
 addpath(['/home/tim/repos/py_solvers/applications/deconvolution_challenge/matlab_benchmark/Misc/'])
 
-str_dir = '/media/sf_Google_Drive/PhD/Projects/DeconvolutionChallenge/Data/P1/';
+str_dir = '/media/sf_Google_Drive/PhD/Projects/DeconvolutionChallenge/Data/P0/';
 %str_measurements = 'Measurements/';
 %str_psfs = 'PSFs/';
 %phantoms
 str_measurements = '';
 str_psfs = '';
-str_case = 'phantom';
-str_case_padded = 'phantom_padded';
+str_case = 'phantom_small';
+str_case_padded = 'phantom_padded_small';
 ary_ground_truth = imreadstack([str_dir str_measurements str_case '.tif']);
 ary_ground_truth_padded = imreadstack([str_dir str_measurements str_case_padded '.tif']);
 
@@ -24,7 +24,7 @@ ary_ground_truth_padded = imreadstack([str_dir str_measurements str_case_padded 
 %y = imreadstack([str_dir str_measurements str_case_padded '.tif']);
 
 %ary_psf = imreadstack([str_dir str_psfs str_case '_psf.tif']);
-ary_psf = imreadstack([str_dir str_psfs 'psf.tif']);
+ary_psf = imreadstack([str_dir str_psfs 'psf_small.tif']);
 %0
 mp = 239.6;
 b = 15.8;
