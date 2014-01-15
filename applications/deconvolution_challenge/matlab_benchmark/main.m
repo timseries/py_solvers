@@ -1,4 +1,11 @@
 %should be in the top level of these directories in MATLAB current directory (matlab_benchmark)
+%get the wavelet transform operator
+import mat_operators.*;
+import mat_utils.*;
+psParameters=ParameterStruct('/home/tim/repos/py_solvers/applications/deconvolution_challenge/p0.ini');
+W=operatorFactory(psParameters,'Transform1');
+
+
 addpath(['/home/tim/repos/py_solvers/applications/deconvolution_challenge/matlab_benchmark/Operators/'])
 addpath(['/home/tim/repos/py_solvers/applications/deconvolution_challenge/matlab_benchmark/Reconstruction/'])
 addpath(['/home/tim/repos/py_solvers/applications/deconvolution_challenge/matlab_benchmark/Metrics/'])
@@ -16,7 +23,8 @@ str_case_padded = 'phantom_padded_small';
 ary_ground_truth = imreadstack([str_dir str_measurements str_case '.tif']);
 ary_ground_truth_padded = imreadstack([str_dir str_measurements str_case_padded '.tif']);
 
-
+wtest = W*ary_ground_truth;
+wtest2 = wtest.getSubbandsArray();
 %challenge data
 %str_measurements = '';
 %str_psfs = '3_';
@@ -31,6 +39,9 @@ b = 15.8;
 stdev = 9.7;
 seed = 1;
 
+nu = 9
+epsilon = 20
+decay=.9
 %1
 %mp = 342.4;
 %b = 7.8;
@@ -57,6 +68,6 @@ seed = 1;
 %y = double(ary_ground_truth);
 y = double(y);
 
-[x0,fun_val,QS]=RLdeblur3D(y,ary_psf,'img',f,'imgb',fb,'iter',100,'verbose',true,'showfig',false,'ismetric',true);
+[x0,fun_val,QS]=sparse_poisson_deblur(y,ary_psf,'img',f,'imgb',fb,'iter',100,'verbose',true,'showfig',false,'ismetric',true,'nu',nu,'epsilon',epsilon,'decay',decay);
 %[x0,fun_val,QS]=RLdeblur3D(ary_ground_truth,ary_psf,'iter',30,'verbose',true,'showfig',true);
 implay(uint8(x0));

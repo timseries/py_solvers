@@ -194,28 +194,28 @@ class PoissonDeblur(Solver):
         Returns the Anscombe transformation of the linear blurring equation 2*sqrt(AW^Tw+b)
         '''
         b1 = b + 3 / 8.0      
-        return 2.0*sqrt(abs(self.H * (~self.W * ws) + b1))
+        return 2.0*sqrt((self.H * (~self.W * ws) + b1))
 
     def f_prime(self, ws, b):
         '''
         The derivative of f(.)
         '''
         f = self.f(ws,b)
-        return 1.0 / (2.0 * f + 1e-6)
+        return 1.0 / (2.0 * f)
 
     def u(self, ws, b):
         ''' 
         Returns the mean of the Anscombe-transformed Poisson random variable
         '''
         f = self.f(ws,b)
-        return f - 1.0 / (2.0 * f + 1e-6)
+        return f - 1.0 / (2.0 * f)
 
     def u_prime(self, ws, b): 
         ''' 
         Returns the derivative of the mean of the Anscombe-transformed Poisson random variable
         '''
         f = self.f(ws,b)
-        return (2.0 / (f + 1e-6) + 1.0 / (f**3 + 1e-6))
+        return (2.0 / (f) + 1.0 / (f**3))
 
     def u_prime_prime(self, ws, b):
         ''' 
