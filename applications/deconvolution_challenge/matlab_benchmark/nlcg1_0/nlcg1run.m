@@ -80,7 +80,7 @@ for iter = 1:maxit
             linesch_ww(x, f, g, p, pars, wolfe1, wolfe2, fvalquit, prtlevel);
     end
     gnorm = norm(g);
-    frec(iter) = f;
+%frec(iter) = f;
     alpharec(iter) = alpha;
     if prtlevel > 1
         fprintf('nlcg: iter %d: step = %5.1e, f = %g, gnorm = %5.1e\n', iter, alpha, f, gnorm)

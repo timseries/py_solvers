@@ -15,7 +15,7 @@ function res=u(w_n,b,h,W)
     
 function res=u_prime(w_n,b,h,W)    
     f = f(w_n,b,h,W);
-    res = 2/f + 1 / f^3;
+    res = 2/f + 1 / f.^3;
     
 function res=f(w_n,b,h,W)
     b1 = b + 3 / 8;
@@ -23,4 +23,7 @@ function res=f(w_n,b,h,W)
     
     
 function res = S(wvec_n,epsilon)
-    res = .5/(wvec_n.^2+epsilon^2)
+    Stemp = zeros(size(wvec_n));
+    Stemp(1:2:end) = .5/(wvec_n(1:2:end).^2+wvec_n(2:2:end).^2+epsilon^2);
+    Stemp(2:2:end) = Stemp(1:2:end);
+    res = Stemp;
