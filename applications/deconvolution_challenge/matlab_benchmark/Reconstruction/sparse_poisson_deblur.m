@@ -79,11 +79,11 @@ pars.h = h;
 pars.W = W;
 pars.epsilon = epsilon;
 pars.w_n = W * x;
-pars.nvar = pars.w_n.getNumCoeffs();
+pars.nvar = pars.w_n.getNumCoeffs()
 pars.fgname = 'fungrad';
 options.maxit=10;
 options.version='C';
-options.prtlevel=1;
+options.prtlevel=2;
 
 % Normalization constant, probably won't need this
 gamma = AdjBop(ones(size(y)));
@@ -103,10 +103,11 @@ end
 for i=1:iter
   q = (y/nu^2 + u(pars.w_n,b,h,W)) / (1 / nu^2 + 1);
   pars.q = q;
-  [wvec_n, f, g, frec, alpharec] = nlcg(pars, options)
+  [x_cols, f_cols, g_cols,frec,alpha] = nlcg(pars,options);
+  wvec_n=x_cols(:,1);
   pars.w_n.setSubbandsArray(wvec_n);
   xnew = W' * pars.w_n;
-  wvec_n = pars.w_n.getSubbandsArray(1:pars.w_n,1)
+  wvec_n = pars.w_n.getSubbandsArray()
 %fun_val(i)=cost(y,Bop,xnew,b);
      
   re=norm(xnew(:)-x(:))/norm(x(:));%relative error
@@ -201,4 +202,7 @@ function res=f(w_n,b,h,W)
 %    grad = gradw.getSubbandsArray() + wvec_n.*S;
     
 function res = S(wvec_n,epsilon)
-    res = .5/(wvec_n.^2+epsilon^2)
+    Stemp = zeros(size(wvec_n));
+    Stemp(1:2:end) = .5/(wvec_n(1:2:end).^2+wvec_n(2:2:end).^2+epsilon^2);
+    Stemp(2:2:end) = Stemp(1:2:end);
+    res = Stemp;
