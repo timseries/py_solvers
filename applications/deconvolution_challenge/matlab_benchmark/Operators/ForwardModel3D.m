@@ -1,4 +1,4 @@
-function [y,f,fb]=ForwardModel3D(f,h,mp,b,stdev,seed)
+function [y,f,fb,Hx]=ForwardModel3D(f,h,mp,b,stdev,seed)
 
 % Adopted Observation model:
 %
@@ -51,6 +51,7 @@ end
 
 %We perform a discrete convolution where we keep only the valid part of the result.
 r=Direct(h,f);
+Hx=r;
 
 k=mp/max(r(:));
 r=k*r;

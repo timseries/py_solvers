@@ -61,7 +61,7 @@ decay=.9;
 
 %observe
 
-[y,f,fb]=ForwardModel3D(ary_ground_truth_padded,ary_psf,mp,b,stdev,seed);
+[y,f,fb,Hx]=ForwardModel3D(ary_ground_truth_padded,ary_psf,mp,b,stdev,seed);
 %reverse quantize the measurements y
 %y = double(ary_ground_truth);
 y = double(y);
