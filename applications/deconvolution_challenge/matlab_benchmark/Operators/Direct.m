@@ -6,7 +6,11 @@ function g = Direct(h, f)
 % 	L = 0;
 	L = mod(M, 2); % Perform the FFTs with even-length data (saves roughly 10 % of computation time)
 % 	tic();
+        disp(num2str(M+L));
+        Hxhat_mat=fftn(h, M+L) .* fftn(f, M+L);
+        xhat_mat=fftn(f, M+L);
 	g = ifftn(fftn(h, M+L) .* fftn(f, M+L));
+        x_mat=f;
 % 	toc();
 	v = colonvec(m, M);
 %        v{1}

@@ -1,4 +1,4 @@
-function [y,f,fb,Hx]=ForwardModel3D(f,h,mp,b,stdev,seed)
+function [y,f,fb]=ForwardModel3D(f,h,mp,b,stdev,seed)
 
 % Adopted Observation model:
 %
@@ -25,7 +25,7 @@ function [y,f,fb,Hx]=ForwardModel3D(f,h,mp,b,stdev,seed)
 % f             Normalized Reference image and appropriately cropped to 
 %               match the size of the measurements.
 % fb            fb=(h*f)+b (h:psf, b:constant value for the background)
-% =========================================================================
+% ============k=============================================================
 
 %Authors: stamatis.lefkimmiatis@epfl.ch, cedric.vonesch@epfl.ch (Biomedical Imaging Group)
 
@@ -51,8 +51,6 @@ end
 
 %We perform a discrete convolution where we keep only the valid part of the result.
 r=Direct(h,f);
-Hx=r;
-
 k=mp/max(r(:));
 r=k*r;
 f=k*f;
@@ -68,5 +66,5 @@ end
 
 fb=r+b;
 f=Crop(f,r);
-
+disp(mean(f(:)));
 y=int16(poissrnd(fb)+w);

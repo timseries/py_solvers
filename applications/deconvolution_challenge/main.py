@@ -6,6 +6,7 @@ import os
 from py_utils.parameter_struct import ParameterStruct
 from py_utils.helpers import convertStr
 from py_utils.section_factory import SectionFactory as sf 
+import numpy as np
 
 def main():
     #configuration specification, absolute path

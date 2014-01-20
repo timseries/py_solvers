@@ -65,11 +65,13 @@ AdjBop = @(y) Adjoint(h, y); % Function handle that corresponds to the adjoint o
 
 %x0 Initialization
 if isempty(x_init)
+    disp(['mean y to adjoint: ', num2str(mean(y(:)))]);
     x_init=Adjoint(h, y);
 end
-size(x_init)
+
 x=x_init;
 
+x0_mat=x_init;
 % Normalization constant
 gamma = AdjBop(ones(size(y)));
 

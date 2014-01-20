@@ -21,7 +21,8 @@ def main():
     sec_input.read(dict_in)
     sec_observe.observe(dict_in)
     so_solver.solve(dict_in)
+    numpy_to_mat(dict_in['x_n'],'/home/tim/repos/py_solvers/applications/deconvolution_challenge/x_n_py.mat','x_n_py')
     so_solver.results.display()
-    
+
 if __name__ == "__main__":
     main()

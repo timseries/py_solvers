@@ -59,14 +59,15 @@ decay=.9;
 %seed = 1;
 
 
-%observe
 
-[y,f,fb,Hx]=ForwardModel3D(ary_ground_truth_padded,ary_psf,mp,b,stdev,seed);
+%observe
+[y,f,fb]=ForwardModel3D(ary_ground_truth_padded,ary_psf,mp,b,stdev,seed);
 %reverse quantize the measurements y
 %y = double(ary_ground_truth);
 y = double(y);
 
 W.lgcAdjoint=0;
-[x0,fun_val,QS]=sparse_poisson_deblur(y,ary_psf,'img',f,'imgb',fb,'iter',100,'verbose',true,'showfig',false,'ismetric',true,'nu',nu,'epsilon',epsilon,'decay',decay,'W',W,'b',b);
+[x0,fun_val,QS]=sparse_poisson_deblur(y,ary_psf,'img',f,'imgb',fb,'iter',100,'verbose',true,'showfig',false,'ismetric',true,'nu',nu,'epsilon',epsilon,'decay',decay,'W',W,'b',b); 
+%[x0,fun_val,QS]=RLdeblur3D(y,ary_psf,'img',f,'imgb',fb,'iter',100,'verbose',true,'showfig',true,'ismetric',true,'nu',nu,'epsilon',epsilon,'decay',decay,'W',W,'b',b); 
 %[x0,fun_val,QS]=RLdeblur3D(ary_ground_truth,ary_psf,'iter',30,'verbose',true,'showfig',true);
 implay(uint8(x0));

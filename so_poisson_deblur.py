@@ -24,6 +24,7 @@ class PoissonDeblur(Solver):
         super(PoissonDeblur,self).__init__(ps_parameters,str_section)
         self.alpha = None
         self.H = OperatorComp(ps_parameters,self.get_val('modalities',False))
+        self.H = self.H.ls_operators[0] #assume we just have one transform
         self.W = OperatorComp(ps_parameters,self.get_val('transforms',False))
         self.W = self.W.ls_operators[0] #assume we just have one transform
         self.alpha = self.get_val('alpha',True)
