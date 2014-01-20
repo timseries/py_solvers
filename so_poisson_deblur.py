@@ -80,7 +80,8 @@ class PoissonDeblur(Solver):
             q_n = (dict_in['y'] / nu[n]**2 + self.u(w_n,b)) / (1 / nu[n]**2 + 1)
             #update w
             w_n.flatten()
-            w_n.ws_vector = ncg(f=self.F,x0=w_n.ws_vector,fprime=self.F_prime,fhess=None,args=(w_n,q_n,b,S_n.ws_vector), avextol=1e-2, epsilon=ncg_epsilon, maxiter=4,retall=0)
+            #w_n.ws_vector = ncg(f=self.F,x0=w_n.ws_vector,fprime=self.F_prime,fhess=None,args=(w_n,q_n,b,S_n.ws_vector), avextol=1e-2, epsilon=ncg_epsilon, maxiter=4,retall=0)
+            w_n.ws_vector = ncg(f=self.F,x0=w_n.ws_vector,fprime=self.F_prime,fhess=None,args=(w_n,q_n,b,S_n.ws_vector), maxiter=4,retall=0)
             #w_n.ws_vector = ncg(f=self.F,x0=w_n.ws_vector,fprime=self.F_prime,args=(w_n,q_n,b,S_n.ws_vector), maxiter=4,retall=0)
 
             w_n.unflatten()
