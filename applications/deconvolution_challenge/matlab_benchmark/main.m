@@ -11,7 +11,7 @@ addpath(['/home/tim/repos/py_solvers/applications/deconvolution_challenge/matlab
 addpath(['/home/tim/repos/py_solvers/applications/deconvolution_challenge/matlab_benchmark/Metrics/'])
 addpath(['/home/tim/repos/py_solvers/applications/deconvolution_challenge/matlab_benchmark/Metrics/FourierMetrics'])
 addpath(['/home/tim/repos/py_solvers/applications/deconvolution_challenge/matlab_benchmark/Misc/'])
-
+f
 str_dir = '/media/sf_Google_Drive/PhD/Projects/DeconvolutionChallenge/Data/P0/';
 %str_measurements = 'Measurements/';
 %str_psfs = 'PSFs/';
