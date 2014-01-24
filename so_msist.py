@@ -57,7 +57,7 @@ class MSIST(Solver):
             self.alpha = su.spectral_radius(self.W,self.H,dict_in['x_0'].shape)
         alpha = self.alpha
         w_n = W * x_n
-        S_n = WS(np.zeros(w_n.ary_scaling.shape),(w_n.one_subband(0)).tup_coeffs) #initialize the variance matrix as a ws object
+        S_n = WS(np.zeros(w_n.ary_lowpass.shape),(w_n.one_subband(0)).tup_coeffs) #initialize the variance matrix as a ws object
         dict_in['w_n'] = w_n
 
         if self.str_solver_variant == 'solvereal': #msist
@@ -71,7 +71,7 @@ class MSIST(Solver):
             p_b_0 = self.get_val('p_b_0',True)
             p_k = self.get_val('p_k',True)
             p_theta = self.get_val('p_theta',True)
-            b_n = WS(np.zeros(w_n.ary_scaling.shape),(w_n.one_subband(0)).tup_coeffs)
+            b_n = WS(np.zeros(w_n.ary_lowpass.shape),(w_n.one_subband(0)).tup_coeffs)
             for s in arange(w_n.int_subbands):
                 b_n.set_subband(s, p_b_0)
         else:
