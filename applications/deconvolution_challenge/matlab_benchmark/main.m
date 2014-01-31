@@ -9,20 +9,24 @@ addpath(['/home/tim/repos/py_solvers/applications/deconvolution_challenge/matlab
 addpath(['/home/tim/repos/py_solvers/applications/deconvolution_challenge/matlab_benchmark/Operators/'])
 addpath(['/home/tim/repos/py_solvers/applications/deconvolution_challenge/matlab_benchmark/Reconstruction/'])
 addpath(['/home/tim/repos/py_solvers/applications/deconvolution_challenge/matlab_benchmark/Metrics/'])
-addpath(['/home/tim/repos/py_solvers/applications/deconvolution_challenge/matlab_benchmark/Metrics/FourierMetrics'])
-addpath(['/home/tim/repos/py_solvers/applications/deconvolution_challenge/matlab_benchmark/Misc/'])
-f
-str_dir = '/media/sf_Google_Drive/PhD/Projects/DeconvolutionChallenge/Data/P0/';
+addpath(['/home/tim/repos/py_solvers/applications/deconvolution_challenge/matlab_benchmark/' ...
+         'Metrics/FourierMetrics'])
+addpath(['/home/tim/repos/py_solvers/applications/deconvolution_challenge/matlab_benchmark/' ...
+         'Misc/'])
+addpath(['/home/tim/repos/scratch/dtcwt'])
+
+
+str_dir = '/media/OS/Documents and Settings/tim/Google Drive/PhD/Projects/DeconvolutionChallenge/Data/P0/';
 %str_measurements = 'Measurements/';
 %str_psfs = 'PSFs/';
 %phantoms
 str_measurements = '';
-str_psfs = '';
+str_psfs = '';T
 str_case = 'phantom';
 str_case_padded = 'phantom_padded';
 ary_ground_truth = imreadstack([str_dir str_measurements str_case '.tif']);
 ary_ground_truth_padded = imreadstack([str_dir str_measurements str_case_padded '.tif']);
-
+str_dir = '/media/OS/Documents and Settings/tim/Google Drive/PhD/Projects/DeconvolutionChallenge/Data/P0/';
 %challenge data
 %str_measurements = '';
 %str_psfs = '3_';
@@ -61,13 +65,18 @@ decay=.9;
 
 
 %observe
-[y,f,fb]=ForwardModel3D(ary_ground_truth_padded,ary_psf,mp,b,stdev,seed);
+[y,f,fb,r]=ForwardModel3D(ary_ground_truth_padded,ary_psf,mp,b,stdev,seed);
 %reverse quantize the measurements y
 %y = double(ary_ground_truth);
+
+
 y = double(y);
 
+%figure;hist(ary_ground_truth(:),100);title('x');figure;hist(r(:),100);title('mp/max(Ax)*Ax');figure;hist(f(:),100);title('mp/max(Ax)*x');figure;hist(fb(:),100);title('mp/max(Ax)*Ax+b');
+
 W.lgcAdjoint=0;
-[x0,fun_val,QS]=sparse_poisson_deblur(y,ary_psf,'img',f,'imgb',fb,'iter',100,'verbose',true,'showfig',false,'ismetric',true,'nu',nu,'epsilon',epsilon,'decay',decay,'W',W,'b',b); 
+%[x0,fun_val,QS]=sparse_poisson_deblur(y,ary_psf,'img',f,'imgb',fb,'iter',100,'verbose',true,'showfig',false,'ismetric',true,'nu',nu,'epsilon',epsilon,'decay',decay,'W',W,'b',b); 
 %[x0,fun_val,QS]=RLdeblur3D(y,ary_psf,'img',f,'imgb',fb,'iter',100,'verbose',true,'showfig',true,'ismetric',true,'nu',nu,'epsilon',epsilon,'decay',decay,'W',W,'b',b); 
+[x0,fun_val,QS]=poisson_deblur_signal_variance(y,ary_psf,'img',f,'imgb',fb,'iter',100,'verbose',true,'showfig',true,'ismetric',true,'nu','W',W,'parameters',psParameters); 
 %[x0,fun_val,QS]=RLdeblur3D(ary_ground_truth,ary_psf,'iter',30,'verbose',true,'showfig',true);
 implay(uint8(x0));

@@ -1,4 +1,6 @@
-function [x0,fun_val,QS]=RLdeblur3D(y,h,varargin)
+function [x0,fun_val,QS]=poisson_deblur_signal_variance(y,h,varargin)
+import mat_operators.*;
+import mat_utils.*;
 
 %Image deblurring with Richardson-Lucy algorithm.
 
@@ -36,10 +38,10 @@ function [x0,fun_val,QS]=RLdeblur3D(y,h,varargin)
 
 %Author: stamatis.lefkimmiatis@epfl.ch (Biomedical Imaging Group)
 
-[x_init,iter,verbose,showfig,tol,img,imgb,b,K,window,L,ismetric]=...
+[x_init,iter,verbose,showfig,tol,img,imgb,b,K,window,L,ismetric,nu,epsilon,decay,W]=...
   process_options(varargin,'x_init',[],'iter',100,'verbose',true,...
   'showfig',false,'tol',1e-5,'img',[],'imgb',[],'b',0,'K',[0.01 0.03],...
-  'window', fspecial('gaussian', 11, 1.5),'L',[],'ismetric',false);
+  'window', fspecial('gaussian', 11, 1.5),'L',[],'ismetric',false,'nu',[],'epsilon',[],'decay',[],'W',[]);
 
 
 if nargout > 2 && ismetric
@@ -65,14 +67,32 @@ AdjBop = @(y) Adjoint(h, y); % Function handle that corresponds to the adjoint o
 
 %x0 Initialization
 if isempty(x_init)
-    disp(['mean y to adjoint: ', num2str(mean(y(:)))]);
     x_init=Adjoint(h, y);
+    
 end
-
+size(x_init)
 x=x_init;
 
-x0_mat=x_init;
-% Normalization constant
+%stuff for nonlinear solver, won't change from iteration to the next
+stcSolver = parameters.getSection('Solver1')
+b = stcSolver.b;
+epsilon = stcSolver.epsilonStart;
+epsilonMin = stcSolver.epsilonStop;
+nu = stcSolver.nuStart;
+nuMin = stcSolver.nuStop;
+decay = stcSolver.decay;
+
+pars.h = h;
+pars.W = W;
+pars.epsilon = epsilon;
+pars.w_n = W * x;
+pars.nvar = pars.w_n.getNumCoeffs()
+pars.fgname = 'fungrad';
+options.maxit=10;
+options.version='C';
+options.prtlevel=2;
+
+% Normalization constant, probably won't need this
 gamma = AdjBop(ones(size(y)));
 
 fun_val=zeros(iter,1);
@@ -85,18 +105,18 @@ if verbose
   fprintf('#iter       fun-val      relative-dif     ISNR\t  RSNR\t   NMISE\t  SSIM_mean\t   SSIM_min\n')
   fprintf('==========================================================================================\n');
 end
-for i=1:iter
-  div=y./(Bop(x)+b);
-  div(isnan(div))=0;
-  xnew=AdjBop(div).*x;
-  xnew = xnew./gamma;
 
-  disp(['x_n min: ' num2str(min(xnew(:)))]);
-  disp(['x_n max: ' num2str(max(xnew(:)))]);
+yb=y-b;
+
+for i=1:iter
+%x is current solution, xnew is update
+  w_n = W * x;
   
-  fun_val(i)=cost(y,Bop,xnew,b);
+  xnew = W' * w_n;
+  wvec_n = pars.w_n.getSubbandsArray()
+%fun_val(i)=cost(y,Bop,xnew,b);
      
-   re=norm(xnew(:)-x(:))/norm(x(:));%relative error
+  re=norm(xnew(:)-x(:))/norm(x(:));%relative error
   if (re < tol)
     count=count+1;
   else
@@ -163,3 +183,32 @@ data_term=Hf(:)-y(:).*log(Hf(:));%0*log(0)=0 by convention. Matlab returns
 data_term(isnan(data_term))=0; 
 data_term(isinf(data_term))=0;
 Q=sum(data_term);
+
+function res=u(w_n,b,h,W)
+    f = f(w_n,b,h,W);
+    res = f - 1 / (2 * f);
+    
+function res=u_prime(w_n,b,h,W)    
+    f = f(w_n,b,h,W);
+    res = 2/f + 1 / f^3;
+    
+function res=f(w_n,b,h,W)
+    b1 = b + 3 / 8;
+    res = 2*sqrt(Direct(h,(W'*w_n))+b1);
+    
+%function [val,grad] = fungrad(wvec_n, pars)
+%    pars.w_n.setSubbandsArray(wvec_n,1:pars.w_n.J,1);
+%    u = u(pars.w_n,pars.b,pars.h,pars.W);
+%    u_prime = u_prime(pars.w_n,pars.b,pars.h,pars.W);
+%%compute S here
+%    S=S(wvec_n,pars.epsilon);
+%%yield fn val
+%    val = (norm(u(:)-pars.q(:),2)^2 + (wvec_n.^2).*S)/2;
+%    gradw = pars.W * Adjoint(pars.h, (u_prime.*(u-pars.q)));
+%    grad = gradw.getSubbandsArray() + wvec_n.*S;
+    
+function res = S(wvec_n,epsilon)
+    Stemp = zeros(size(wvec_n));
+    Stemp(1:2:end) = .5/(wvec_n(1:2:end).^2+wvec_n(2:2:end).^2+epsilon^2);
+    Stemp(2:2:end) = Stemp(1:2:end);
+    res = Stemp;
