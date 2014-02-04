@@ -1,6 +1,7 @@
 function [x0,fun_val,QS]=poisson_deblur_signal_variance(y,h,varargin)
 import mat_operators.*;
 import mat_utils.*;
+import mat_utils.results.*;
 
 %Image deblurring with Richardson-Lucy algorithm.
 
@@ -38,10 +39,10 @@ import mat_utils.*;
 
 %Author: stamatis.lefkimmiatis@epfl.ch (Biomedical Imaging Group)
 
-[x_init,iter,verbose,showfig,tol,img,imgb,b,K,window,L,ismetric,nu,epsilon,decay,W]=...
+[x_init,iter,verbose,showfig,tol,img,imgb,K,window,L,ismetric,W,parameters]=...
   process_options(varargin,'x_init',[],'iter',100,'verbose',true,...
-  'showfig',false,'tol',1e-5,'img',[],'imgb',[],'b',0,'K',[0.01 0.03],...
-  'window', fspecial('gaussian', 11, 1.5),'L',[],'ismetric',false,'nu',[],'epsilon',[],'decay',[],'W',[]);
+  'showfig',false,'tol',1e-5,'img',[],'imgb',[],'K',[0.01 0.03],...
+  'window', fspecial('gaussian', 11, 1.5),'L',[],'ismetric',false,'W',[],'parameters',[]);
 
 
 if nargout > 2 && ismetric
@@ -55,9 +56,13 @@ else
   QS=[];
 end
 
+stcObserve = parameters.getSection('Observe1')
+b = stcObserve.Background;
 
 if b < 0
   error('RLdeblur3D: Background must have a non-negative value');
+else
+    disp(num2str(b));
 end
 
 
@@ -75,22 +80,12 @@ x=x_init;
 
 %stuff for nonlinear solver, won't change from iteration to the next
 stcSolver = parameters.getSection('Solver1')
-b = stcSolver.b;
 epsilon = stcSolver.epsilonStart;
 epsilonMin = stcSolver.epsilonStop;
 nu = stcSolver.nuStart;
 nuMin = stcSolver.nuStop;
 decay = stcSolver.decay;
-
-pars.h = h;
-pars.W = W;
-pars.epsilon = epsilon;
-pars.w_n = W * x;
-pars.nvar = pars.w_n.getNumCoeffs()
-pars.fgname = 'fungrad';
-options.maxit=10;
-options.version='C';
-options.prtlevel=2;
+levs=W.get('nlevels');
 
 % Normalization constant, probably won't need this
 gamma = AdjBop(ones(size(y)));
@@ -108,13 +103,78 @@ end
 
 yb=y-b;
 
-for i=1:iter
-%x is current solution, xnew is update
   w_n = W * x;
+  N=size(Adjoint(h,y));
+  szyb=size(yb);
+  yb_padded = zeros(N);
+  v=colonvec((N-szyb)/2+1,szyb+(N-szyb)/2);
+  yb_padded(v{:})=yb;
+  w_y_n=W*yb_padded;
+  Yscale=w_y_n.caryScaling;
+  S=w_n.copy;
+%  alpha=10.0*stcSolver.alpha;
+  alpha=0.25*ones(size(stcSolver.alpha));
+  alpha(1)=1;
+  ary_variance=cell(levs,1);
+  for lev=1:levs
+      ary_variance_temp=Yscale{lev}./((2*sqrt(2))^(lev));
+      ary_variance{lev}=1/8.0*(ary_variance_temp(1:2:end,1:2:end,1:2:end) + ...
+                               ary_variance_temp(1:2:end,1:2:end,2:2:end) + ...
+                               ary_variance_temp(1:2:end,2:2:end,1:2:end) + ...
+                               ary_variance_temp(1:2:end,2:2:end,2:2:end) + ...
+                               ary_variance_temp(2:2:end,1:2:end,1:2:end) + ...
+                               ary_variance_temp(2:2:end,1:2:end,2:2:end) + ...
+                               ary_variance_temp(2:2:end,2:2:end,1:2:end) + ...
+                               ary_variance_temp(2:2:end,2:2:end,2:2:end));
+  end    
+for i=1:iter
+%RL step
+%  div=y./(Bop(x)+b);
+%  div(isnan(div))=0;
+%  x=(AdjBop(div).*x)./gamma;
+
+
+
+%x is current solution, xnew is update
+  for j=1:w_n.J
+      lev=max(1,floor((j-2)/28)+1);
+%      if j==1
+%          var_map=w_y_n{1};
+%      else    
+%          var_map=ary_variance{lev};
+%      end    
+      S{j}=1/(0.5.*(abs(w_n{j}).^2) + epsilon^2);
+  end
+  resid = yb - Direct(h,x);
   
-  xnew = W' * w_n;
-  wvec_n = pars.w_n.getSubbandsArray()
-%fun_val(i)=cost(y,Bop,xnew,b);
+  wr=W * (Adjoint(h,resid));
+  for j=1:w_n.J
+      lev=max(1,floor((j-2)/28)+1);
+      wj=w_n{j};
+      wrj=wr{j};
+      if j==1
+          var_map=w_y_n{1};
+      else    
+          var_map=ary_variance{lev};
+      end    
+%      var_map=0;
+      wj=((alpha(j)+(nu^2+var_map).*S{j}).^-1).* ... %threshold
+         (alpha(j)*(wj)+wrj); %Landweber
+      w_n{j}=wj;
+  end
+  xnew=W'*w_n;
+%  xnew(xnew<.15*max(xnew(:)))=0;
+  xnew(xnew<b)=0;
+  xnewtemp = zeros(N);
+  xnewtemp(v{:})=xnew(v{:});
+  xnew=xnewtemp;
+
+  w_n=W*xnew;
+  epsilon=max(epsilonMin,epsilon*decay)
+  nu=max(nuMin,nu*decay)
+  
+%some hard thresholding
+fun_val(i)=cost(y,Bop,xnew,b);
      
   re=norm(xnew(:)-x(:))/norm(x(:));%relative error
   if (re < tol)
@@ -157,7 +217,7 @@ for i=1:iter
   x=xnew; 
     
   if showfig
-    fh=figure(1);
+    fh=sfigure(1);
     figure(fh);
     msg=['iteration: ' num2str(i) ' ,Objective Value: ' num2str(fun_val(i))];
     set(fh,'name',msg);imshow(max(x,[],3),[]);
@@ -171,18 +231,20 @@ for i=1:iter
 end
 
 if ~exist('x0', 'var');
-	x0 = Crop(y, x);
+	x0 = Crop(x, y);
 end
 
 function Q=cost(y,Bop,f,b)
 
 Hf=Bop(f)+b;
 Hf(Hf<0)=0;
-data_term=Hf(:)-y(:).*log(Hf(:));%0*log(0)=0 by convention. Matlab returns 
+%data_term=Hf(:)-y(:).*log(Hf(:));%0*log(0)=0 by convention. Matlab returns 
+data_term=norm(Hf(:)+b-y(:),2)^2;%0*log(0)=0 by convention. Matlab returns 
 %NAN so we have to fix this. 
 data_term(isnan(data_term))=0; 
 data_term(isinf(data_term))=0;
-Q=sum(data_term);
+%Q=sum(data_term);
+Q=data_term;
 
 function res=u(w_n,b,h,W)
     f = f(w_n,b,h,W);

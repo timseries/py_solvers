@@ -109,7 +109,7 @@ class PoissonDeblur(Solver):
         if self.alpha.__class__.__name__ != 'ndarray':
             self.alpha = su.spectral_radius(self.W,self.H,(136,136,64))
         alpha = self.alpha
-        alpha = 10.0*alpha
+        alpha = 2.0*alpha
         #alpha = 0.012 * np.ones(w_n.int_subbands,)
         alpha[0] = 1
         print alpha
@@ -157,7 +157,7 @@ class PoissonDeblur(Solver):
             print 'x_n min: ' + str(np.min(x_n))
             print 'x_n max: ' + str(np.max(x_n))
 
-            x_n[x_n<0] = 0 #correct for negative values
+            #x_n[x_n<0] = 0 #correct for negative values
 
             w_n = W * x_n #reprojection, to put our iterate in the range space, prevent drifting
             dict_in['x_n'] = x_n
