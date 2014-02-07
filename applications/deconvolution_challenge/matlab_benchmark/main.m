@@ -3,7 +3,7 @@
 import mat_operators.*;
 import mat_utils.*;
 import mat_utils.results.*;
-psParameters=ParameterStruct('/home/tim/repos/py_solvers/applications/deconvolution_challenge/p1.ini');
+psParameters=ParameterStruct('/home/tim/repos/py_solvers/applications/deconvolution_challenge/p0.ini');
 W=operatorFactory(psParameters,'Transform1');
 stcInput1 = psParameters.getSection('Input1');
 stcInput2 = psParameters.getSection('Input2');
@@ -19,7 +19,7 @@ addpath(['/home/tim/repos/py_solvers/applications/deconvolution_challenge/matlab
 addpath(['/home/tim/repos/scratch/dtcwt'])
 addpath(['/home/tim/repos/py_operators/dtcwt/matlab/qbgn'])
 
-
+str_eval_result_dir='/home/tim/repos/py_solvers/applications/deconvolution_challenge/eval_results/';
 %str_dir = '/media/OS/Documents and Settings/tim/Google Drive/PhD/Projects/DeconvolutionChallenge/Data/P0/';
 str_dir = stcInput1.FileDir;
 
@@ -44,19 +44,19 @@ ary_ground_truth_padded = imreadstack([str_dir str_measurements str_case_padded]
 %ary_psf = imreadstack([str_dir str_psfs str_case '_psf.tif']);
 ary_psf = imreadstack([str_dir str_psfs str_psf]);
 %0
-%mp = 239.6;
-%b = 15.8;
-%stdev = 9.7;
-%seed = 1;
+mp = 239.6;
+b = 15.8;
+stdev = 9.7;
+seed = 1;
 
 nu = 9;
 epsilon = 20;
 decay=.9;
 %1
-mp = 342.4;
-b = 7.8;
-stdev = 3.1;
-seed = 1;
+%mp = 342.4;
+%b = 7.8;
+%stdev = 3.1;
+%seed = 1;
 
 %2
 %mp = 289.8;

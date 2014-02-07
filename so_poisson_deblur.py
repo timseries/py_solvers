@@ -157,7 +157,7 @@ class PoissonDeblur(Solver):
             print 'x_n min: ' + str(np.min(x_n))
             print 'x_n max: ' + str(np.max(x_n))
 
-            #x_n[x_n<0] = 0 #correct for negative values
+            x_n[x_n<b] = 0 #correct for negative values
 
             w_n = W * x_n #reprojection, to put our iterate in the range space, prevent drifting
             dict_in['x_n'] = x_n
