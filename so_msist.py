@@ -60,11 +60,11 @@ class MSIST(Solver):
         S_n = WS(np.zeros(w_n.ary_lowpass.shape),(w_n.one_subband(0)).tup_coeffs) #initialize the variance matrix as a ws object
         dict_in['w_n'] = w_n
 
-        if self.str_solver_variant == 'solvereal': #msist
+        if self.str_sparse_pen == 'l0rl2': #msist
             epsilon,nu = self.get_epsilon_nu()
             dict_in['nu_sq'] = nu**2
             dict_in['epsilon_sq'] = epsilon**2
-        elif self.str_solver_variant == 'solvevbmm': #vbmm    
+        elif self.str_sparse_pen == 'vbmm': #vbmm    
             nu = self.get_val('nustart',True) * np.ones(self.int_iterations,)
             dict_in['nu_sq'] = nu**2
             p_a = self.get_val('p_a',True)
@@ -81,7 +81,7 @@ class MSIST(Solver):
         for n in np.arange(self.int_iterations):
             f_resid = ifftn(y_hat - H * x_n)
             w_resid = W * ifftn(~H * f_resid)
-            for s in arange(1,w_n.int_subbands):
+            for s in arange(w_n.int_subbands):
                 #variance estimate
                 if self.str_solver_variant == 'solvereal': #msist
                     S_n.set_subband(s,(1.0 / ((1.0 / g_i) * nabs(w_n.get_subband(s))**2 + epsilon[n]**2)))

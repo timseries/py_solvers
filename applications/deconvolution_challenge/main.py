@@ -16,7 +16,6 @@ def main():
     ps_params = ParameterStruct(ps_path)
     dict_in = {}
     sec_input = sf.create_section(ps_params,'Input1')
-    #sec_preprocess = sf.create_section(ps_params,'Preprocess1') implement  later
     sec_observe = sf.create_section(ps_params,'Observe1')
     so_solver = sf.create_section(ps_params,'Solver1')
 
