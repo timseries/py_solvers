@@ -1,8 +1,7 @@
 #!/usr/bin/python -tt
 import numpy as np
-from numpy import arange, conj
+from numpy import arange, conj, abs as nabs, exp, maximum as nmax
 from numpy.fft import fftn, ifftn
-from numpy import abs as nabs, exp, maximum as nmax
 from py_utils.signal_utilities.ws import WS
 import py_utils.signal_utilities.sig_utils as su
 from py_solvers.solver import Solver
@@ -87,10 +86,10 @@ class MSIST(Solver):
                     S_n.set_subband(s,(1.0 / ((1.0 / g_i) * nabs(w_n.get_subband(s))**2 + epsilon[n]**2)))
                 elif self.str_solver_variant == 'solvevbmm': #vbmm    
                     if n == 0:
-                        sigma = 0
+                        sigma_n = 0
                     else:
-                        sigma = (1.0 / nu[n]**2 * alpha[s] + S_n.get_subband(s))**(-1)
-                    S_n.set_subband(s, (g_i + 2.0 * p_a) / (nabs(w_n.get_subband(s))**2 + sigma + 2.0 * b_n.get_subband(s)))
+                        sigma_n = (1.0 / nu[n]**2 * alpha[s] + S_n.get_subband(s))**(-1)
+                    S_n.set_subband(s, (g_i + 2.0 * p_a) / (nabs(w_n.get_subband(s))**2 + sigma_n + 2.0 * b_n.get_subband(s)))
                     b_n.set_subband(s, (p_k + p_a) / (S_n.get_subband(s) + p_theta))
                 else:
                     raise Exception('no such solver variant')
