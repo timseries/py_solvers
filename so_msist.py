@@ -32,7 +32,7 @@ class MSIST(Solver):
             self.W = self.W.ls_ops[0] 
         self.alpha = self.get_val('alpha',True)
         self.str_group_structure = self.get_val('grouptypes',False)
-        print self.str_group_structure
+        
     def solve(self,dict_in):
         """
         Takes an input object (ground truth, forward model observation, metrics required)
@@ -88,6 +88,7 @@ class MSIST(Solver):
             raise Exception("no MSIST solver variant " + self.str_sparse_pen)
         #begin iterations here
         self.results.update(dict_in)
+        adj_factor = 1.3
         for n in np.arange(self.int_iterations):
             H.output_fourier = 1
             f_resid = ifftn(y_hat - H * x_n)
@@ -102,8 +103,11 @@ class MSIST(Solver):
                         sigma_n = 0
                     else:
                         sigma_n = (1.0 / nu[n]**2 * alpha[s] + S_n.get_subband(s))**(-1)
-                    S_n.set_subband(s, (g_i + 2.0 * p_a) / (nabs(w_n.get_subband(s))**2 + sigma_n + 2.0 * b_n.get_subband(s)))
-                    b_n.set_subband(s, (p_k + p_a) / (S_n.get_subband(s) + p_theta))
+                    S_n.set_subband(s, (g_i + 2.0 * p_a) / 
+                                    (nabs(w_n.get_subband(s))**2 + 
+                                     sigma_n + 2.0 * b_n.get_subband(s)))
+                    b_n.set_subband(s, (p_k + p_a) / 
+                                    (S_n.get_subband(s) + p_theta))
                 elif self.str_sparse_pen == 'vbmm_hmt': #vbmm    
                     if n == 0:
                         sigma_n = 0
@@ -116,15 +120,14 @@ class MSIST(Solver):
                         s_parent_us[0::2,1::2]=s_parent
                         s_parent_us[1::2,0::2]=s_parent
                         s_parent_us[1::2,1::2]=s_parent
-                        adj_factor = .5
                         S_n.set_subband(s, (g_i + 2.0 * ary_a[s]) / 
                                         (nabs(w_n.get_subband(s))**2 + sigma_n + 
                                          2.0 * adj_factor * np.abs(s_parent_us)**2))
                     else: #no parents, so generate fixed-param gammas
-                        S_n.set_subband(s, (g_i + 2.0 * p_a) / 
+                        S_n.set_subband(s, (g_i + 2.0 * ary_a[s]) / 
                                         (nabs(w_n.get_subband(s))**2 + sigma_n +
                                          2.0 * b_n.get_subband(s)))
-                        b_n.set_subband(s, (p_k + p_a) / 
+                        b_n.set_subband(s, (p_k + ary_a[s]) / 
                                         (S_n.get_subband(s) + p_theta))
                 else:
                     ValueError('no such solver variant')
@@ -167,6 +170,23 @@ class MSIST(Solver):
             raise Exception('no such continuation parameter rule')
         return epsilon,nu
 
+    def get_gamma_shapes2(self, ws_coeffs):
+        """Use maximum likelihood to obtain the shape parameters 
+        for each a gamma distribution.
+
+        Return:
+          ary_a (ndarray): a 1-d array of shape parameters
+        """
+        ary_a = np.zeros(ws_coeffs.int_subbands,)
+        for s in xrange(1,ws_coeffs.int_subbands):
+            subband = ws_coeffs.get_subband(s).flatten()
+            subband_ri = np.concatenate((subband.real,subband.imag))
+            fit_nu, fit_loc, fit_scale = ss.t.fit(subband_ri,floc=0)
+            print fit_scale
+            ary_a[s] = fit_nu / 2
+        print ary_a    
+        return ary_a    
+
     def get_gamma_shapes(self, ws_coeffs):
         """Use maximum likelihood to obtain the shape parameters 
         for each a gamma distribution.
@@ -175,13 +195,35 @@ class MSIST(Solver):
           ary_a (ndarray): a 1-d array of shape parameters
         """
         ary_a = np.zeros(ws_coeffs.int_subbands,)
-        for s in xrange(ws_coeffs.int_subbands):
-            subband = ws_coeffs.get_subband(s).flatten()
-            subband_ri = np.concatenate((subband.real,subband.imag))
-            fit_nu, fit_loc, fit_scale = ss.t.fit(subband_ri)
+        # for s in xrange(1,ws_coeffs.int_subbands,6):
+        for s in xrange(1,ws_coeffs.int_subbands,6):
+            for s2 in xrange(s,s+6):
+                subband = ws_coeffs.get_subband(s2).flatten()
+                subband_ri = np.concatenate((subband.real,subband.imag))
+                if s2==s:
+                    subband_tot=np.zeros(subband_ri.size*4)
+                    subband_tot_45=np.zeros(subband_ri.size*2)
+                    index=0
+                    index_45=0
+                if np.mod(s2-2,6)==0 or np.mod(s2-5,6)==0:
+                    subband_tot_45[index_45:index_45+subband_ri.size]=subband_ri.copy()
+                    index_45=index_45+subband_ri.size
+                else:    
+                    subband_tot[index:index+subband_ri.size]=subband_ri.copy()
+                    index=index+subband_ri.size
+            fit_nu, fit_loc, fit_scale = ss.t.fit(subband_tot,floc=0)
+            print fit_scale
             ary_a[s] = fit_nu / 2
+            ary_a[s+2:s+4] = fit_nu / 2
+            ary_a[s+5] = fit_nu / 2
+            fit_nu, fit_loc, fit_scale = ss.t.fit(subband_tot_45,floc=0)
+            print fit_scale
+            ary_a[s+1] = fit_nu / 2
+            ary_a[s+4] = fit_nu / 2
+        print ary_a    
         return ary_a    
-            
+
+    
     class Factory:
         def create(self,ps_params,str_section):
             return MSIST(ps_params,str_section)
