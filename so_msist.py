@@ -66,7 +66,8 @@ class MSIST(Solver):
         S_n = WS(np.zeros(w_n.ary_lowpass.shape),(w_n.one_subband(0)).tup_coeffs) #initialize the variance matrix as a ws object
         dict_in['w_n'] = w_n
 
-        if self.str_sparse_pen == 'l0rl2': #msist
+        if (self.str_sparse_pen == 'l0rl2' or
+            self.str_sparse_pen == 'l0rl2_hmt'): #msist
             epsilon,nu = self.get_epsilon_nu()
             dict_in['nu_sq'] = nu**2
             dict_in['epsilon_sq'] = epsilon**2
@@ -98,6 +99,16 @@ class MSIST(Solver):
                 #variance estimate
                 if self.str_sparse_pen == 'l0rl2': #msist
                     S_n.set_subband(s,(1.0 / ((1.0 / g_i) * nabs(w_n.get_subband(s))**2 + epsilon[n]**2)))
+                    
+                elif self.str_sparse_pen == 'l0rl2_hmt':  #this doesn't work well
+                    if s < w_n.int_subbands - w_n.int_orientations and s > 0:    
+                        s_parent_us=self.get_upsampled_parent(s,w_n)
+                        S_n.set_subband(s,(1.0 / 
+                                           ((1.0 / g_i) * 
+                                            nabs(w_n.get_subband(s))**2 + (np.abs(s_parent_us)**2))))
+                    else:
+                        S_n.set_subband(s,(1.0 / ((1.0 / g_i) * nabs(w_n.get_subband(s))**2 + epsilon[n]**2)))
+                        
                 elif self.str_sparse_pen == 'vbmm': #vbmm    
                     if n == 0:
                         sigma_n = 0
@@ -113,16 +124,11 @@ class MSIST(Solver):
                         sigma_n = 0
                     else:
                         sigma_n = (1.0 / nu[n]**2 * alpha[s] + S_n.get_subband(s))**(-1)
-                    if s < w_n.int_subbands - 6 and s > 0:    
-                        s_parent = w_n.get_subband(s+6)
-                        s_parent_us = np.zeros((2*s_parent.shape[0],2*s_parent.shape[1]))
-                        s_parent_us[0::2,0::2]=s_parent
-                        s_parent_us[0::2,1::2]=s_parent
-                        s_parent_us[1::2,0::2]=s_parent
-                        s_parent_us[1::2,1::2]=s_parent
-                        S_n.set_subband(s, (g_i + 2.0 * ary_a[s]) / 
+                    if s < w_n.int_subbands - w_n.int_orientations and s > 0:    
+                        s_parent_us = self.get_upsampled_parent(s,w_n)
+                        S_n.set_subband(s, (g_i + 2.0 *  ary_a[s]) / 
                                         (nabs(w_n.get_subband(s))**2 + sigma_n + 
-                                         2.0 * adj_factor * np.abs(s_parent_us)**2))
+                                         2.0 * ary_a[s] * (2**(-1.5)) * np.abs(s_parent_us)**2))
                     else: #no parents, so generate fixed-param gammas
                         S_n.set_subband(s, (g_i + 2.0 * ary_a[s]) / 
                                         (nabs(w_n.get_subband(s))**2 + sigma_n +
@@ -223,7 +229,18 @@ class MSIST(Solver):
         print ary_a    
         return ary_a    
 
-    
+    def get_upsampled_parent(self,s,w_n):
+        """Return the upsampled parent layer of subband s
+        """
+        s_parent = w_n.get_subband(s+w_n.int_orientations)
+        s_parent_us=np.zeros((2*s_parent.shape[0],2*s_parent.shape[1]))
+        #todo: generalize this to arbitrary dimensions
+        s_parent_us[0::2,0::2]=s_parent
+        s_parent_us[0::2,1::2]=s_parent
+        s_parent_us[1::2,0::2]=s_parent
+        s_parent_us[1::2,1::2]=s_parent
+        return s_parent_us
+
     class Factory:
         def create(self,ps_params,str_section):
             return MSIST(ps_params,str_section)
