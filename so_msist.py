@@ -73,7 +73,8 @@ class MSIST(Solver):
             dict_in['epsilon_sq'] = epsilon**2
         elif (self.str_sparse_pen == 'vbmm' or  #vbmm    
               self.str_sparse_pen == 'vbmm_hmt'):
-            nu = self.get_val('nustart',True) * np.ones(self.int_iterations,)
+            epsilon,nu = self.get_epsilon_nu()
+            # nu = self.get_val('nustart',True) * np.ones(self.int_iterations,)
             dict_in['nu_sq'] = nu**2
             p_a = self.get_val('p_a',True)
             p_b_0 = self.get_val('p_b_0',True)
@@ -91,10 +92,12 @@ class MSIST(Solver):
         self.results.update(dict_in)
         adj_factor = 1.3
         for n in np.arange(self.int_iterations):
-            H.output_fourier = 1
+            
+            H.set_output_fourier(True)
             f_resid = ifftn(y_hat - H * x_n)
-            w_resid = W * ifftn(~H * f_resid)
-            H.output_fourier = 0
+            H.set_output_fourier(False)
+            w_resid = W * (~H * f_resid)
+
             for s in xrange(w_n.int_subbands-1,-1,-1):
                 #variance estimate
                 if self.str_sparse_pen == 'l0rl2': #msist
@@ -128,7 +131,7 @@ class MSIST(Solver):
                         s_parent_us = self.get_upsampled_parent(s,w_n)
                         S_n.set_subband(s, (g_i + 2.0 *  ary_a[s]) / 
                                         (nabs(w_n.get_subband(s))**2 + sigma_n + 
-                                         2.0 * ary_a[s] * (2**(-1.5)) * np.abs(s_parent_us)**2))
+                                         2.0 * ary_a[s] * (2**(-1.25)) * np.abs(s_parent_us)**2))
                     else: #no parents, so generate fixed-param gammas
                         S_n.set_subband(s, (g_i + 2.0 * ary_a[s]) / 
                                         (nabs(w_n.get_subband(s))**2 + sigma_n +
@@ -145,6 +148,7 @@ class MSIST(Solver):
             w_n = W * x_n #reprojection, to put our iterate in the range space, prevent drifting
             dict_in['x_n'] = x_n
             dict_in['w_n'] = w_n
+            print nu[n]**2
             #update results
             self.results.update(dict_in)
         return dict_in
