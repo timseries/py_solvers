@@ -131,7 +131,7 @@ class MSIST(Solver):
                         s_parent_us = self.get_upsampled_parent(s,w_n)
                         S_n.set_subband(s, (g_i + 2.0 *  ary_a[s]) / 
                                         (nabs(w_n.get_subband(s))**2 + sigma_n + 
-                                         2.0 * ary_a[s] * (2**(-1.25)) * np.abs(s_parent_us)**2))
+                                         2.0 * ary_a[s] * (2**(-2.25)) * np.abs(s_parent_us)**2))
                     else: #no parents, so generate fixed-param gammas
                         S_n.set_subband(s, (g_i + 2.0 * ary_a[s]) / 
                                         (nabs(w_n.get_subband(s))**2 + sigma_n +
