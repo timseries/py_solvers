@@ -134,7 +134,7 @@ class MSIST(Solver):
                         alpha_dec = small_var_mask * 3.1 + (1-small_var_mask) * 2.25
                         S_n.set_subband(s, (g_i + 2.0 *  ary_a[s]) / 
                                         (nabs(w_n.get_subband(s))**2 + sigma_n + 
-                                         2.0 * ary_a[s] * (2**(-alpha_dec)) * (np.abs(s_parent_us)**2+epsilon[n]**2)))
+                                         2.0 * ary_a[s] * (2**(-alpha_dec)) * (np.abs(s_parent_us)**2)))
                         
                     else: #no parents, so generate fixed-param gammas
                         S_n.set_subband(s, (g_i + 2.0 * ary_a[s]) / 
