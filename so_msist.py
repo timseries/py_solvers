@@ -127,11 +127,15 @@ class MSIST(Solver):
                         sigma_n = 0
                     else:
                         sigma_n = (1.0 / nu[n]**2 * alpha[s] + S_n.get_subband(s))**(-1)
-                    if s < w_n.int_subbands - w_n.int_orientations and s > 0:    
+                    # if s < w_n.int_subbands - w_n.int_orientations and s > 0:    
+                    if s > 0:    
                         s_parent_us = self.get_upsampled_parent(s,w_n)
+                        small_var_mask = s_parent_us**2 < np.mean(s_parent_us**2)
+                        alpha_dec = small_var_mask * 3.1 + (1-small_var_mask) * 2.25
                         S_n.set_subband(s, (g_i + 2.0 *  ary_a[s]) / 
                                         (nabs(w_n.get_subband(s))**2 + sigma_n + 
-                                         2.0 * ary_a[s] * (2**(-2.25)) * np.abs(s_parent_us)**2))
+                                         2.0 * ary_a[s] * (2**(-alpha_dec)) * (np.abs(s_parent_us)**2+epsilon[n]**2)))
+                        
                     else: #no parents, so generate fixed-param gammas
                         S_n.set_subband(s, (g_i + 2.0 * ary_a[s]) / 
                                         (nabs(w_n.get_subband(s))**2 + sigma_n +
@@ -148,7 +152,6 @@ class MSIST(Solver):
             w_n = W * x_n #reprojection, to put our iterate in the range space, prevent drifting
             dict_in['x_n'] = x_n
             dict_in['w_n'] = w_n
-            print nu[n]**2
             #update results
             self.results.update(dict_in)
         return dict_in
@@ -236,13 +239,24 @@ class MSIST(Solver):
     def get_upsampled_parent(self,s,w_n):
         """Return the upsampled parent layer of subband s
         """
-        s_parent = w_n.get_subband(s+w_n.int_orientations)
-        s_parent_us=np.zeros((2*s_parent.shape[0],2*s_parent.shape[1]))
-        #todo: generalize this to arbitrary dimensions
-        s_parent_us[0::2,0::2]=s_parent
-        s_parent_us[0::2,1::2]=s_parent
-        s_parent_us[1::2,0::2]=s_parent
-        s_parent_us[1::2,1::2]=s_parent
+        if s+w_n.int_orientations>=w_n.int_subbands:
+            #we actually need to downsample in this case
+            subband_index = 0
+        else:
+            subband_index = s+w_n.int_orientations
+        s_parent = w_n.get_subband(subband_index)
+        if subband_index==0:
+            s_parent_us=1/4.0*(s_parent[0::2,0::2] + 
+                               s_parent[0::2,1::2] + 
+                               s_parent[1::2,0::2] + 
+                               s_parent[1::2,1::2])
+        else:
+            s_parent_us=np.zeros((2*s_parent.shape[0],2*s_parent.shape[1]))
+            #todo: generalize this to arbitrary dimensions
+            s_parent_us[0::2,0::2]=s_parent
+            s_parent_us[0::2,1::2]=s_parent
+            s_parent_us[1::2,0::2]=s_parent
+            s_parent_us[1::2,1::2]=s_parent
         return s_parent_us
 
     class Factory:
