@@ -130,12 +130,36 @@ class MSIST(Solver):
                     # if s < w_n.int_subbands - w_n.int_orientations and s > 0:    
                     if s > 0:    
                         s_parent_us = self.get_upsampled_parent(s,w_n)
-                        small_var_mask = s_parent_us**2 < 10*np.mean(s_parent_us**2)
+                        #small_var_mask = s_parent_us**2 < 10*np.mean(s_parent_us**2)
                         # alpha_dec = small_var_mask * 3.1 + (1-small_var_mask) * 2.25
                         alpha_dec = 2.25
+                        s_child_en = np.abs(w_n.get_subband(s))**2
+                        s_child_sz = s_child_en.shape
+                        s_child_en = 1/4.0*(s_child_en[0::2,0::2] +
+                                          s_child_en[1::2,0::2] +
+                                          s_child_en[0::2,1::2] +
+                                          s_child_en[1::2,1::2])
+                        s_child_en_avg = np.zeros(s_child_sz)
+                        s_child_en_avg[0::2,0::2] = s_child_en
+                        s_child_en_avg[1::2,0::2] = s_child_en
+                        s_child_en_avg[0::2,1::2] = s_child_en
+                        s_child_en_avg[1::2,1::2] = s_child_en
+                        # S_n.set_subband(s, (g_i + 2.0 *  ary_a[s]) / 
+                        #                 (nabs(w_n.get_subband(s))**2 + sigma_n + 
+                        #                  2.0 * ary_a[s] * (2**(-alpha_dec)) * (np.abs(s_parent_us)**2)))
                         S_n.set_subband(s, (g_i + 2.0 *  ary_a[s]) / 
                                         (nabs(w_n.get_subband(s))**2 + sigma_n + 
-                                         2.0 * ary_a[s] * (2**(-alpha_dec)) * (np.abs(s_parent_us)**2)))
+                                         2.0 * ary_a[s] * 1/5.0*(4.0*s_child_en_avg+np.abs(s_parent_us)**2)))
+                        # S_n.set_subband(s, (g_i + 2.0 *  ary_a[s]) / 
+                        #                 (s_child_en_avg + sigma_n + 
+                        #                  2.0 * ary_a[s] * (2**(-alpha_dec)) * (np.abs(s_parent_us)**2)))
+                        # S_n.set_subband(s, (g_i + 2.0 *  ary_a[s]) / 
+                        #                 (nabs(w_n.get_subband(s))**2 + sigma_n + 
+                        #                  2.0 * ary_a[s] * 1/2.0*(nabs(w_n.get_subband(s))**2+np.abs(s_parent_us)**2)))
+                        # S_n.set_subband(s, (g_i + 2.0 *  ary_a[s]) / 
+                        #                 (nabs(w_n.get_subband(s))**2 + 1/5.0*(4.0*s_child_en_avg+np.abs(s_parent_us)**2) + 
+                        #                  2.0 * ary_a[s] * (2**(-alpha_dec)) * (np.abs(s_parent_us)**2)))
+
                         
                     else: #no parents, so generate fixed-param gammas
                         S_n.set_subband(s, (g_i + 2.0 * ary_a[s]) / 
@@ -178,8 +202,8 @@ class MSIST(Solver):
             nu = np.asarray([nu_start * exp(-i / decay) + nu_stop \
                                   for i in arange(self.int_iterations)])
         elif str_method == 'fixed':
-            epsilon = epsilon_start
-            nu = nu_start
+            epsilon = epsilon_start*np.ones(self.int_iterations,)
+            nu = nu_start*np.ones(self.int_iterations,)
         else:
             raise Exception('no such continuation parameter rule')
         return epsilon,nu
