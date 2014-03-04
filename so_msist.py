@@ -130,8 +130,9 @@ class MSIST(Solver):
                     # if s < w_n.int_subbands - w_n.int_orientations and s > 0:    
                     if s > 0:    
                         s_parent_us = self.get_upsampled_parent(s,w_n)
-                        small_var_mask = s_parent_us**2 < np.mean(s_parent_us**2)
-                        alpha_dec = small_var_mask * 3.1 + (1-small_var_mask) * 2.25
+                        small_var_mask = s_parent_us**2 < 10*np.mean(s_parent_us**2)
+                        # alpha_dec = small_var_mask * 3.1 + (1-small_var_mask) * 2.25
+                        alpha_dec = 2.25
                         S_n.set_subband(s, (g_i + 2.0 *  ary_a[s]) / 
                                         (nabs(w_n.get_subband(s))**2 + sigma_n + 
                                          2.0 * ary_a[s] * (2**(-alpha_dec)) * (np.abs(s_parent_us)**2)))
