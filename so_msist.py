@@ -31,6 +31,9 @@ class MSIST(Solver):
         if len(self.W.ls_ops)==1: #avoid slow 'eval' in OperatorComp
             self.W = self.W.ls_ops[0] 
         self.alpha = self.get_val('alpha',True)
+        self.alpha_method = self.get_val('alphamethod',False)
+        if self.alpha_method=='':
+            self.alpha_method = 'spectrum'
         self.str_group_structure = self.get_val('grouptypes',False)
         
     def solve(self,dict_in):
@@ -60,8 +63,8 @@ class MSIST(Solver):
             raise Exception("no such group structure " + self.str_group_structure)
         #input parameters and initialization
         if self.alpha.__class__.__name__ != 'ndarray':
-            self.alpha = su.spectral_radius(self.W,self.H,dict_in['x_0'].shape)
-        alpha = self.alpha
+            self.alpha = su.spectral_radius(self.W,self.H,dict_in['x_0'].shape,self.alpha_method)
+        alpha = self.alpha    
         w_n = W * x_n
         S_n = WS(np.zeros(w_n.ary_lowpass.shape),(w_n.one_subband(0)).tup_coeffs) #initialize the variance matrix as a ws object
         dict_in['w_n'] = w_n
@@ -133,6 +136,7 @@ class MSIST(Solver):
                         #small_var_mask = s_parent_us**2 < 10*np.mean(s_parent_us**2)
                         # alpha_dec = small_var_mask * 3.1 + (1-small_var_mask) * 2.25
                         alpha_dec = 2.25
+                        # alpha_dec = 3.1
                         s_child_en = np.abs(w_n.get_subband(s))**2
                         s_child_sz = s_child_en.shape
                         s_child_en = 1/4.0*(s_child_en[0::2,0::2] +
@@ -155,11 +159,17 @@ class MSIST(Solver):
                         #                  2.0 * ary_a[s] * (2**(-alpha_dec)) * (np.abs(s_parent_us)**2)))
                         # S_n.set_subband(s, (g_i + 2.0 *  ary_a[s]) / 
                         #                 (nabs(w_n.get_subband(s))**2 + sigma_n + 
-                        #                  2.0 * ary_a[s] * 1/2.0*(nabs(w_n.get_subband(s))**2+np.abs(s_parent_us)**2)))
+                        #                  2.0 * ary_a[s] * 
+                        #                  1/2.0*(nabs(w_n.get_subband(s))**2+np.abs(s_parent_us)**2)))
                         # S_n.set_subband(s, (g_i + 2.0 *  ary_a[s]) / 
                         #                 (nabs(w_n.get_subband(s))**2 + 1/5.0*(4.0*s_child_en_avg+np.abs(s_parent_us)**2) + 
                         #                  2.0 * ary_a[s] * (2**(-alpha_dec)) * (np.abs(s_parent_us)**2)))
-
+                        # S_n.set_subband(s, (g_i + 2.0 *  ary_a[s]) / 
+                        #                 (nabs(w_n.get_subband(s))**2 + 1/2.0*(nabs(w_n.get_subband(s))**2+np.abs(s_parent_us)**2) + 
+                        #                  2.0 * ary_a[s] * (2**(-alpha_dec)) * (np.abs(s_parent_us)**2)))
+                        # S_n.set_subband(s, (g_i + 2.0 *  ary_a[s]) / 
+                        #                 (1/1.0*(nabs(w_n.get_subband(s))**2+np.abs(s_parent_us)**2) + sigma_n +
+                        #                  2.0 * ary_a[s] * (2**(-alpha_dec)) * (np.abs(s_parent_us)**2)))
                         
                     else: #no parents, so generate fixed-param gammas
                         S_n.set_subband(s, (g_i + 2.0 * ary_a[s]) / 
