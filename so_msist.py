@@ -1,6 +1,6 @@
 #!/usr/bin/python -tt
 import numpy as np
-from numpy import arange, conj, abs as nabs, exp, maximum as nmax
+from numpy import arange, conj, sqrt,median, abs as nabs, exp, maximum as nmax
 from numpy.fft import fftn, ifftn
 from py_utils.signal_utilities.ws import WS
 import py_utils.signal_utilities.sig_utils as su
@@ -67,18 +67,23 @@ class MSIST(Solver):
         alpha = self.alpha    
         w_n = W * x_n
         S_n = WS(np.zeros(w_n.ary_lowpass.shape),(w_n.one_subband(0)).tup_coeffs) #initialize the variance matrix as a ws object
+        #every variant does these
         dict_in['w_n'] = w_n
+        epsilon,nu = self.get_epsilon_nu()
+        dict_in['nu_sq'] = nu**2
+        dict_in['epsilon_sq'] = epsilon**2
+        #l0rl2_bivar specific
+        if self.str_sparse_pen == 'l0rl2_bivar':    
+            #the thresholds which is saved 
+            w_tilde = WS(np.zeros(w_n.ary_lowpass.shape),
+                         (w_n.one_subband(0)).tup_coeffs)
 
-        if (self.str_sparse_pen == 'l0rl2' or
-            self.str_sparse_pen == 'l0rl2_hmt'): #msist
-            epsilon,nu = self.get_epsilon_nu()
-            dict_in['nu_sq'] = nu**2
-            dict_in['epsilon_sq'] = epsilon**2
-        elif (self.str_sparse_pen == 'vbmm' or  #vbmm    
-              self.str_sparse_pen == 'vbmm_hmt'):
-            epsilon,nu = self.get_epsilon_nu()
-            # nu = self.get_val('nustart',True) * np.ones(self.int_iterations,)
-            dict_in['nu_sq'] = nu**2
+        #vbmm specific
+        if (self.str_sparse_pen == 'vbmm' or  #vbmm    
+            self.str_sparse_pen == 'vbmm_hmt'):
+            b_n = WS(np.zeros(w_n.ary_lowpass.shape),
+                     (w_n.one_subband(0)).tup_coeffs)
+
             p_a = self.get_val('p_a',True)
             p_b_0 = self.get_val('p_b_0',True)
             p_k = self.get_val('p_k',True)
@@ -89,29 +94,46 @@ class MSIST(Solver):
                 ary_a = self.get_gamma_shapes(W * dict_in['x_0'])
             for s in arange(w_n.int_subbands):
                 b_n.set_subband(s, p_b_0)
-        else:
-            raise Exception("no MSIST solver variant " + self.str_sparse_pen)
         #begin iterations here
         self.results.update(dict_in)
         adj_factor = 1.3
         for n in np.arange(self.int_iterations):
-            
+            # if np.mod(n,100)==0:
             H.set_output_fourier(True)
             f_resid = ifftn(y_hat - H * x_n)
             H.set_output_fourier(False)
             w_resid = W * (~H * f_resid)
 
+            if self.str_sparse_pen == 'l0rl2_bivar' and n==0:
+                hh = (nabs(w_n.get_subband(2))).flatten()
+                sigsq_n = su.mad(hh)/.6745 #eq 7, Sendur BSWLVE paper, why isn't this squared?
+                sig_n = sqrt(sigsq_n)
+                sqrt3=sqrt(3.0)
             for s in xrange(w_n.int_subbands-1,-1,-1):
                 #variance estimate
                 if self.str_sparse_pen == 'l0rl2': #msist
                     S_n.set_subband(s,(1.0 / ((1.0 / g_i) * nabs(w_n.get_subband(s))**2 + epsilon[n]**2)))
                     
-                elif self.str_sparse_pen == 'l0rl2_hmt':  #this doesn't work well
-                    if s < w_n.int_subbands - w_n.int_orientations and s > 0:    
-                        s_parent_us=self.get_upsampled_parent(s,w_n)
-                        S_n.set_subband(s,(1.0 / 
-                                           ((1.0 / g_i) * 
-                                            nabs(w_n.get_subband(s))**2 + (np.abs(s_parent_us)**2))))
+                elif self.str_sparse_pen == 'l0rl2_bivar':
+                    if s > 0:    
+                        s_parent_us = nabs(self.get_upsampled_parent(s,w_n))**2
+                        s_child = nabs(w_n.get_subband(s))**2
+                        yi,yi_mask = su.get_neighborhoods(s_child,1) #eq 8, Sendur BSWLVE paper
+                        s_child_norm = sqrt(s_parent_us + s_child)
+                        if n==0:#np.mod(n,20)==0:    
+                            sigsq_y = np.sum(yi,axis=yi.ndim-1)/np.sum(yi_mask,axis=yi.ndim-1)#still eq 8...
+                            sig = sqrt(np.maximum(sqrt(sigsq_y)-sig_n,0))
+                            w_tilde.set_subband(s, sqrt3*sig_n/sig) #the thresholding fn
+                        thresh = np.maximum(s_child_norm - w_tilde.get_subband(s),0)/s_child_norm #eq 5
+                        
+                        if np.mod(n,1)==0:    
+                            S_n.set_subband(s,(1.0 / 
+                                               ((1.0 / g_i) *  
+                                                nabs(thresh * w_n.get_subband(s))**2 + (epsilon[n]**2))))
+                        else:
+                            S_n.set_subband(s,(1.0 / 
+                                               ((1.0 / g_i) * 
+                                                nabs(w_n.get_subband(s))**2 + (epsilon[n]**2))))
                     else:
                         S_n.set_subband(s,(1.0 / ((1.0 / g_i) * nabs(w_n.get_subband(s))**2 + epsilon[n]**2)))
                         
@@ -148,35 +170,21 @@ class MSIST(Solver):
                         s_child_en_avg[1::2,0::2] = s_child_en
                         s_child_en_avg[0::2,1::2] = s_child_en
                         s_child_en_avg[1::2,1::2] = s_child_en
-                        # S_n.set_subband(s, (g_i + 2.0 *  ary_a[s]) / 
-                        #                 (nabs(w_n.get_subband(s))**2 + sigma_n + 
-                        #                  2.0 * ary_a[s] * (2**(-alpha_dec)) * (np.abs(s_parent_us)**2)))
+                        # if n==0:
+                            # if s==10:
+                                # print 'b estimate'
+                        # b_n.set_subband(s,ary_a[s] * 1/2.0*(nabs(w_n.get_subband(s))**2+np.abs(s_parent_us)**2))
+                        # b_n.set_subband(s,ary_a[s] *  (2**(-alpha_dec)) * (np.abs(s_parent_us)**2))
                         S_n.set_subband(s, (g_i + 2.0 *  ary_a[s]) / 
                                         (nabs(w_n.get_subband(s))**2 + sigma_n + 
-                                         2.0 * ary_a[s] * 1/5.0*(4.0*s_child_en_avg+np.abs(s_parent_us)**2)))
-                        # S_n.set_subband(s, (g_i + 2.0 *  ary_a[s]) / 
-                        #                 (s_child_en_avg + sigma_n + 
-                        #                  2.0 * ary_a[s] * (2**(-alpha_dec)) * (np.abs(s_parent_us)**2)))
-                        # S_n.set_subband(s, (g_i + 2.0 *  ary_a[s]) / 
-                        #                 (nabs(w_n.get_subband(s))**2 + sigma_n + 
-                        #                  2.0 * ary_a[s] * 
-                        #                  1/2.0*(nabs(w_n.get_subband(s))**2+np.abs(s_parent_us)**2)))
-                        # S_n.set_subband(s, (g_i + 2.0 *  ary_a[s]) / 
-                        #                 (nabs(w_n.get_subband(s))**2 + 1/5.0*(4.0*s_child_en_avg+np.abs(s_parent_us)**2) + 
-                        #                  2.0 * ary_a[s] * (2**(-alpha_dec)) * (np.abs(s_parent_us)**2)))
-                        # S_n.set_subband(s, (g_i + 2.0 *  ary_a[s]) / 
-                        #                 (nabs(w_n.get_subband(s))**2 + 1/2.0*(nabs(w_n.get_subband(s))**2+np.abs(s_parent_us)**2) + 
-                        #                  2.0 * ary_a[s] * (2**(-alpha_dec)) * (np.abs(s_parent_us)**2)))
-                        # S_n.set_subband(s, (g_i + 2.0 *  ary_a[s]) / 
-                        #                 (1/1.0*(nabs(w_n.get_subband(s))**2+np.abs(s_parent_us)**2) + sigma_n +
-                        #                  2.0 * ary_a[s] * (2**(-alpha_dec)) * (np.abs(s_parent_us)**2)))
-                        
+                                         2.0 * b_n.get_subband(s)))
+                        b_n.set_subband(s,ary_a[s] * 1/5.0*(4.0*s_child_en_avg+np.abs(s_parent_us)**2))
                     else: #no parents, so generate fixed-param gammas
+                        b_n.set_subband(s, (p_k + ary_a[s]) / 
+                                        (S_n.get_subband(s) + p_theta))
                         S_n.set_subband(s, (g_i + 2.0 * ary_a[s]) / 
                                         (nabs(w_n.get_subband(s))**2 + sigma_n +
                                          2.0 * b_n.get_subband(s)))
-                        b_n.set_subband(s, (p_k + ary_a[s]) / 
-                                        (S_n.get_subband(s) + p_theta))
                 else:
                     ValueError('no such solver variant')
                 #update current solution
@@ -259,13 +267,13 @@ class MSIST(Solver):
                 else:    
                     subband_tot[index:index+subband_ri.size]=subband_ri.copy()
                     index=index+subband_ri.size
-            fit_nu, fit_loc, fit_scale = ss.t.fit(subband_tot,floc=0)
-            print fit_scale
+            fit_nu, fit_loc, fit_scale = ss.t.fit(subband_tot)
+            # print fit_scale
             ary_a[s] = fit_nu / 2
             ary_a[s+2:s+4] = fit_nu / 2
             ary_a[s+5] = fit_nu / 2
-            fit_nu, fit_loc, fit_scale = ss.t.fit(subband_tot_45,floc=0)
-            print fit_scale
+            fit_nu, fit_loc, fit_scale = ss.t.fit(subband_tot_45)
+            # print fit_scale
             ary_a[s+1] = fit_nu / 2
             ary_a[s+4] = fit_nu / 2
         print ary_a    
