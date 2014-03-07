@@ -170,15 +170,15 @@ class MSIST(Solver):
                         s_child_en_avg[1::2,0::2] = s_child_en
                         s_child_en_avg[0::2,1::2] = s_child_en
                         s_child_en_avg[1::2,1::2] = s_child_en
-                        # if n==0:
-                            # if s==10:
-                                # print 'b estimate'
+                        if np.mod(n,100)==0:#n==0:
+                            b_n.set_subband(s,ary_a[s] * 1/5.0*(4.0*s_child_en_avg+np.abs(s_parent_us)**2))
+                            if s==10:
+                                print 'b estimate'
                         # b_n.set_subband(s,ary_a[s] * 1/2.0*(nabs(w_n.get_subband(s))**2+np.abs(s_parent_us)**2))
                         # b_n.set_subband(s,ary_a[s] *  (2**(-alpha_dec)) * (np.abs(s_parent_us)**2))
                         S_n.set_subband(s, (g_i + 2.0 *  ary_a[s]) / 
                                         (nabs(w_n.get_subband(s))**2 + sigma_n + 
                                          2.0 * b_n.get_subband(s)))
-                        b_n.set_subband(s,ary_a[s] * 1/5.0*(4.0*s_child_en_avg+np.abs(s_parent_us)**2))
                     else: #no parents, so generate fixed-param gammas
                         b_n.set_subband(s, (p_k + ary_a[s]) / 
                                         (S_n.get_subband(s) + p_theta))
