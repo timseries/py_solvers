@@ -106,12 +106,12 @@ class MSIST(Solver):
 
             if self.str_sparse_pen == 'l0rl2_bivar':
                 hh = (nabs(w_n.get_subband(2))).flatten()
-                # sigsq_n = su.mad(hh)/.6745 #eq 7, Sendur BSWLVE paper, why isn't this squared?
+                sigsq_n = su.mad(hh)/.6745 #eq 7, Sendur BSWLVE paper, why isn't this squared?
                 # print sigsq_n
                 # sigsq_n = dict_in['nu_sq'][-1]
                 # sigsq_n = .34809
                 # sigsq_n = .05
-                sigsq_n = self.get_val('nustop', True)**2
+                # sigsq_n = self.get_val('nustop', True)**2
                 sig_n = sqrt(sigsq_n)
                 sqrt3=sqrt(3.0)
             for s in xrange(w_n.int_subbands-1,-1,-1):
