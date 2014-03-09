@@ -127,7 +127,7 @@ class MSIST(Solver):
                         s_child_norm = sqrt(s_parent_us + s_child)
                         if 1:#n==0:#np.mod(n,20)==0:    
                             sigsq_y = np.sum(yi,axis=yi.ndim-1)/np.sum(yi_mask,axis=yi.ndim-1)#still eq 8...
-                            sigsq_y = s_child
+                            # sigsq_y = s_child
                             sig = sqrt(np.maximum(sigsq_y-sigsq_n,0))
                             w_tilde.set_subband(s, sqrt3*sigsq_n/sig) #the thresholding fn
                         thresh = np.maximum(s_child_norm - w_tilde.get_subband(s),0)/s_child_norm #eq 5
