@@ -104,9 +104,14 @@ class MSIST(Solver):
             H.set_output_fourier(False)
             w_resid = W * (~H * f_resid)
 
-            if self.str_sparse_pen == 'l0rl2_bivar' and n==0:
+            if self.str_sparse_pen == 'l0rl2_bivar':
                 hh = (nabs(w_n.get_subband(2))).flatten()
-                sigsq_n = su.mad(hh)/.6745 #eq 7, Sendur BSWLVE paper, why isn't this squared?
+                # sigsq_n = su.mad(hh)/.6745 #eq 7, Sendur BSWLVE paper, why isn't this squared?
+                # print sigsq_n
+                # sigsq_n = dict_in['nu_sq'][-1]
+                # sigsq_n = .34809
+                # sigsq_n = .05
+                sigsq_n = self.get_val('nustop', True)**2
                 sig_n = sqrt(sigsq_n)
                 sqrt3=sqrt(3.0)
             for s in xrange(w_n.int_subbands-1,-1,-1):
@@ -118,15 +123,16 @@ class MSIST(Solver):
                     if s > 0:    
                         s_parent_us = nabs(self.get_upsampled_parent(s,w_n))**2
                         s_child = nabs(w_n.get_subband(s))**2
-                        yi,yi_mask = su.get_neighborhoods(s_child,1) #eq 8, Sendur BSWLVE paper
+                        yi,yi_mask = su.get_neighborhoods(s_child,1) #eq 8, Sendur BSWLVE paper, yzhang code doesn't do this...
                         s_child_norm = sqrt(s_parent_us + s_child)
-                        if n==0:#np.mod(n,20)==0:    
+                        if 1:#n==0:#np.mod(n,20)==0:    
                             sigsq_y = np.sum(yi,axis=yi.ndim-1)/np.sum(yi_mask,axis=yi.ndim-1)#still eq 8...
-                            sig = sqrt(np.maximum(sqrt(sigsq_y)-sig_n,0))
-                            w_tilde.set_subband(s, sqrt3*sig_n/sig) #the thresholding fn
+                            sigsq_y = s_child
+                            sig = sqrt(np.maximum(sigsq_y-sigsq_n,0))
+                            w_tilde.set_subband(s, sqrt3*sigsq_n/sig) #the thresholding fn
                         thresh = np.maximum(s_child_norm - w_tilde.get_subband(s),0)/s_child_norm #eq 5
                         
-                        if np.mod(n,1)==0:    
+                        if np.mod(n,2)==0:    
                             S_n.set_subband(s,(1.0 / 
                                                ((1.0 / g_i) *  
                                                 nabs(thresh * w_n.get_subband(s))**2 + (epsilon[n]**2))))
