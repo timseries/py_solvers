@@ -176,10 +176,10 @@ class MSIST(Solver):
                         s_child_en_avg[1::2,0::2] = s_child_en
                         s_child_en_avg[0::2,1::2] = s_child_en
                         s_child_en_avg[1::2,1::2] = s_child_en
-                        if np.mod(n,100)==0:#n==0:
+                        if np.mod(n,1)==0:#n==0:
                             b_n.set_subband(s,ary_a[s] * 1/5.0*(4.0*s_child_en_avg+np.abs(s_parent_us)**2))
-                            if s==10:
-                                print 'b estimate'
+                            # if s==10:
+                                # print 'b estimate'
                         # b_n.set_subband(s,ary_a[s] * 1/2.0*(nabs(w_n.get_subband(s))**2+np.abs(s_parent_us)**2))
                         # b_n.set_subband(s,ary_a[s] *  (2**(-alpha_dec)) * (np.abs(s_parent_us)**2))
                         S_n.set_subband(s, (g_i + 2.0 *  ary_a[s]) / 

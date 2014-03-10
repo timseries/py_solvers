@@ -25,9 +25,7 @@ def main():
     sec_observe.observe(dict_in)
     so_solver.solve(dict_in)
     so_solver.results.display()
-
-    # plt.imshow(dict_in['x_n'],cmap='gray')
-    # plt.show()
+    so_solver.results.save()
 
 if __name__ == "__main__":
     main()
