@@ -2,6 +2,7 @@
 import numpy as np
 from numpy import arange, conj, sqrt,median, abs as nabs, exp, maximum as nmax
 from numpy.fft import fftn, ifftn
+from numpy.linalg import norm
 from py_utils.signal_utilities.ws import WS
 import py_utils.signal_utilities.sig_utils as su
 from py_solvers.solver import Solver
@@ -95,6 +96,7 @@ class MSIST(Solver):
             for s in arange(w_n.int_subbands):
                 b_n.set_subband(s, p_b_0)
         #begin iterations here
+        dict_in['vbmm_pen']=np.zeros(1,)
         self.results.update(dict_in)
         adj_factor = 1.3
         for n in np.arange(self.int_iterations):
@@ -176,7 +178,7 @@ class MSIST(Solver):
                         s_child_en_avg[1::2,0::2] = s_child_en
                         s_child_en_avg[0::2,1::2] = s_child_en
                         s_child_en_avg[1::2,1::2] = s_child_en
-                        if np.mod(n,1)==0:#n==0:
+                        if np.mod(n,100)==0:#n==0:
                             b_n.set_subband(s,ary_a[s] * 1/5.0*(4.0*s_child_en_avg+np.abs(s_parent_us)**2))
                             # if s==10:
                                 # print 'b estimate'
@@ -201,6 +203,8 @@ class MSIST(Solver):
             w_n = W * x_n #reprojection, to put our iterate in the range space, prevent drifting
             dict_in['x_n'] = x_n
             dict_in['w_n'] = w_n
+            dict_in['vbmm_pen'] = (.5*(norm(dict_in['y'].flatten()-(H*dict_in['x_n']).flatten(),2)**2)
+                                   -(nu[n]**2)*sum(dict_in['w_n'].flatten(False)))
             #update results
             self.results.update(dict_in)
         return dict_in
