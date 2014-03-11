@@ -78,13 +78,11 @@ class MSIST(Solver):
             #the thresholds which is saved 
             w_tilde = WS(np.zeros(w_n.ary_lowpass.shape),
                          (w_n.one_subband(0)).tup_coeffs)
-
         #vbmm specific
         if (self.str_sparse_pen == 'vbmm' or  #vbmm    
             self.str_sparse_pen == 'vbmm_hmt'):
             b_n = WS(np.zeros(w_n.ary_lowpass.shape),
                      (w_n.one_subband(0)).tup_coeffs)
-
             p_a = self.get_val('p_a',True)
             p_b_0 = self.get_val('p_b_0',True)
             p_k = self.get_val('p_k',True)
@@ -105,14 +103,7 @@ class MSIST(Solver):
             f_resid = ifftn(y_hat - H * x_n)
             H.set_output_fourier(False)
             w_resid = W * (~H * f_resid)
-
             if self.str_sparse_pen == 'l0rl2_bivar' and n==0:
-                # hh = (nabs(w_n.get_subband(2))).flatten() #this doesn't work, maybee because of cplx wavelet
-                # sigsq_n = su.mad(hh**2)/.6745 #eq 7, Sendur BSWLVE paper, why isn't this squared?
-                # print sigsq_n
-                # sigsq_n = dict_in['nu_sq'][-1]
-                # sigsq_n = .34809
-                # sigsq_n = .05
                 sigsq_n = self.get_val('nustop', True)**2
                 sig_n = sqrt(sigsq_n)
                 sqrt3=sqrt(3.0)
@@ -162,29 +153,52 @@ class MSIST(Solver):
                         sigma_n = (1.0 / nu[n]**2 * alpha[s] + S_n.get_subband(s))**(-1)
                     # if s < w_n.int_subbands - w_n.int_orientations and s > 0:    
                     if s > 0:    
-                        s_parent_us = self.get_upsampled_parent(s,w_n)
+                        w_parent_us = self.get_upsampled_parent(s,w_n)
                         #small_var_mask = s_parent_us**2 < 10*np.mean(s_parent_us**2)
                         # alpha_dec = small_var_mask * 3.1 + (1-small_var_mask) * 2.25
                         alpha_dec = 2.25
                         # alpha_dec = 3.1
-                        s_child_en = np.abs(w_n.get_subband(s))**2
-                        s_child_sz = s_child_en.shape
-                        s_child_en = 1/4.0*(s_child_en[0::2,0::2] +
-                                          s_child_en[1::2,0::2] +
-                                          s_child_en[0::2,1::2] +
-                                          s_child_en[1::2,1::2])
-                        s_child_en_avg = np.zeros(s_child_sz)
-                        s_child_en_avg[0::2,0::2] = s_child_en
-                        s_child_en_avg[1::2,0::2] = s_child_en
-                        s_child_en_avg[0::2,1::2] = s_child_en
-                        s_child_en_avg[1::2,1::2] = s_child_en
-                        if np.mod(n,100)==0:#n==0:
-                            b_n.set_subband(s,ary_a[s] * 1/5.0*(4.0*s_child_en_avg+np.abs(s_parent_us)**2))
+                        w_en = np.abs(w_n.get_subband(s))**2
+                        w_en = 1/4.0*(w_en[0::2,0::2] +
+                                      w_en[1::2,0::2] +
+                                      w_en[0::2,1::2] +
+                                      w_en[1::2,1::2])
+                        if s > S_n.int_orientations:
+                            s_child = S_n.get_subband(s-S_n.int_orientations)
+                            s_child = (s_child[0::2,0::2] +
+                                       s_child[1::2,0::2] +
+                                       s_child[0::2,1::2] +
+                                       s_child[1::2,1::2])
+                        else:
+                            s_child = 0    
+                        if s < S_n.int_subbands - S_n.int_orientations:
+                            ap = ary_a[s+S_n.int_orientations]
+                        else:
+                            ap = 0.5
+                        w_en_avg = np.zeros(2*np.array(w_en.shape))
+                        w_en_avg[0::2,0::2] = w_en
+                        w_en_avg[1::2,0::2] = w_en
+                        w_en_avg[0::2,1::2] = w_en
+                        w_en_avg[1::2,1::2] = w_en
+                        # if np.mod(n,1)==0:#n==0:
+                            # the parent+4 children b
+                            # b_n.set_subband(s,ary_a[s] * 1/5.0*(4.0*w_en_avg+np.abs(w_parent_us)**2))
+                            #the vbmm hmt model for s,b
+                        b_n.set_subband(s,(4*ary_a[s]+ap) /
+                                        (s_child + 2**(-alpha_dec) * S_n.get_subband(s)))
                             # if s==10:
                                 # print 'b estimate'
                         # b_n.set_subband(s,ary_a[s] * 1/2.0*(nabs(w_n.get_subband(s))**2+np.abs(s_parent_us)**2))
                         # b_n.set_subband(s,ary_a[s] *  (2**(-alpha_dec)) * (np.abs(s_parent_us)**2))
-                        S_n.set_subband(s, (g_i + 2.0 *  ary_a[s]) / 
+                        # S_n.set_subband(s, (g_i + 2.0 *  ary_a[s]) / 
+                        #                 (nabs(w_n.get_subband(s))**2 + sigma_n + 
+                        #                  2.0 * b_n.get_subband(s)))
+                        #the standard vbmm b with estimated shape parameter
+                        # S_n.set_subband(s, (g_i + 2.0 *  ary_a[s]) / 
+                        #                 (nabs(w_n.get_subband(s))**2 + sigma_n + 
+                        #                  2.0 * b_n.get_subband(s)))
+                        #the vbmm hmt model for s,b
+                        S_n.set_subband(s, (g_i + 2.0 * ap +  ary_a[s]) / 
                                         (nabs(w_n.get_subband(s))**2 + sigma_n + 
                                          2.0 * b_n.get_subband(s)))
                     else: #no parents, so generate fixed-param gammas
