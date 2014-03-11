@@ -94,7 +94,6 @@ class MSIST(Solver):
             for s in arange(w_n.int_subbands):
                 b_n.set_subband(s, p_b_0)
         #begin iterations here
-        dict_in['vbmm_pen']=np.zeros(1,)
         self.results.update(dict_in)
         adj_factor = 1.3
         for n in np.arange(self.int_iterations):
@@ -156,7 +155,8 @@ class MSIST(Solver):
                         w_parent_us = self.get_upsampled_parent(s,w_n)
                         #small_var_mask = s_parent_us**2 < 10*np.mean(s_parent_us**2)
                         # alpha_dec = small_var_mask * 3.1 + (1-small_var_mask) * 2.25
-                        alpha_dec = 2.25
+                        alpha_dec = .25
+                        # alpha_dec = .5
                         # alpha_dec = 3.1
                         w_en = np.abs(w_n.get_subband(s))**2
                         w_en = 1/4.0*(w_en[0::2,0::2] +
@@ -169,44 +169,48 @@ class MSIST(Solver):
                                        s_child[1::2,0::2] +
                                        s_child[0::2,1::2] +
                                        s_child[1::2,1::2])
+                            b_child = b_n.get_subband(s-S_n.int_orientations)
+                            b_child = (b_child[0::2,0::2] +
+                                             b_child[1::2,0::2] +
+                                             b_child[0::2,1::2] +
+                                             b_child[1::2,1::2])
                         else:
-                            s_child = 0    
+                            s_child = 0 
+                            b_child = 0   
                         if s < S_n.int_subbands - S_n.int_orientations:
                             ap = ary_a[s+S_n.int_orientations]
                         else:
-                            ap = 0.5
+                            ap = .5
                         w_en_avg = np.zeros(2*np.array(w_en.shape))
                         w_en_avg[0::2,0::2] = w_en
                         w_en_avg[1::2,0::2] = w_en
                         w_en_avg[0::2,1::2] = w_en
                         w_en_avg[1::2,1::2] = w_en
-                        # if np.mod(n,1)==0:#n==0:
-                            # the parent+4 children b
-                            # b_n.set_subband(s,ary_a[s] * 1/5.0*(4.0*w_en_avg+np.abs(w_parent_us)**2))
-                            #the vbmm hmt model for s,b
-                        b_n.set_subband(s,(4*ary_a[s]+ap) /
-                                        (s_child + 2**(-alpha_dec) * S_n.get_subband(s)))
-                            # if s==10:
-                                # print 'b estimate'
+                        #other b estimators
                         # b_n.set_subband(s,ary_a[s] * 1/2.0*(nabs(w_n.get_subband(s))**2+np.abs(s_parent_us)**2))
                         # b_n.set_subband(s,ary_a[s] *  (2**(-alpha_dec)) * (np.abs(s_parent_us)**2))
                         # S_n.set_subband(s, (g_i + 2.0 *  ary_a[s]) / 
                         #                 (nabs(w_n.get_subband(s))**2 + sigma_n + 
                         #                  2.0 * b_n.get_subband(s)))
-                        #the standard vbmm b with estimated shape parameter
+                        #the standard vbmm b with estimated shape parameter,works with the parent+4 children b
                         # S_n.set_subband(s, (g_i + 2.0 *  ary_a[s]) / 
                         #                 (nabs(w_n.get_subband(s))**2 + sigma_n + 
                         #                  2.0 * b_n.get_subband(s)))
-                        #the vbmm hmt model for s,b
-                        S_n.set_subband(s, (g_i + 2.0 * ap +  ary_a[s]) / 
+                        #the vbmm hmt model for s,b, ngk
+                        S_n.set_subband(s, (g_i + 2.0 * ap + ary_a[s]) / 
                                         (nabs(w_n.get_subband(s))**2 + sigma_n + 
-                                         2.0 * b_n.get_subband(s)))
+                                         2.0 * ((2**(-alpha_dec))*b_child + b_n.get_subband(s))))
+                        # the parent+4 children b
+                        # b_n.set_subband(s,ary_a[s] * 1/5.0*(4.0*w_en_avg+np.abs(w_parent_us)**2))
+                        #the vbmm hmt model for s,b, ngk
+                        b_n.set_subband(s,(4*ary_a[s]+ap) /
+                                        (s_child + 2**(-alpha_dec) * S_n.get_subband(s)))
                     else: #no parents, so generate fixed-param gammas
-                        b_n.set_subband(s, (p_k + ary_a[s]) / 
-                                        (S_n.get_subband(s) + p_theta))
                         S_n.set_subband(s, (g_i + 2.0 * ary_a[s]) / 
                                         (nabs(w_n.get_subband(s))**2 + sigma_n +
                                          2.0 * b_n.get_subband(s)))
+                        b_n.set_subband(s, (p_k + ary_a[s]) / 
+                                        (S_n.get_subband(s) + p_theta))
                 else:
                     ValueError('no such solver variant')
                 #update current solution
@@ -217,8 +221,6 @@ class MSIST(Solver):
             w_n = W * x_n #reprojection, to put our iterate in the range space, prevent drifting
             dict_in['x_n'] = x_n
             dict_in['w_n'] = w_n
-            dict_in['vbmm_pen'] = (.5*(norm(dict_in['y'].flatten()-(H*dict_in['x_n']).flatten(),2)**2)
-                                   -(nu[n]**2)*sum(dict_in['w_n'].flatten(False)))
             #update results
             self.results.update(dict_in)
         return dict_in
