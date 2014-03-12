@@ -13,6 +13,7 @@ def main():
     #configuration specification, absolute path
     # ps_path='/home/tim/repos/py_solvers/applications/deconvolution/uniform_40db_bsnr_cameraman.ini'
     ps_path='/home/tim/repos/py_solvers/applications/deconvolution/gaussian_downsampled_cameraman.ini'
+    # ps_path='/home/tim/repos/py_solvers/applications/deconvolution/uniform_downsampled_cameraman.ini'
     ps_params = ParameterStruct(ps_path)
     dict_in = {}
     sec_input = sf.create_section(ps_params,'Input1')

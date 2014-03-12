@@ -3,6 +3,7 @@ import numpy as np
 from numpy import arange, conj, sqrt,median, abs as nabs, exp, maximum as nmax
 from numpy.fft import fftn, ifftn
 from numpy.linalg import norm
+
 from py_utils.signal_utilities.ws import WS
 import py_utils.signal_utilities.sig_utils as su
 from py_solvers.solver import Solver
@@ -113,7 +114,7 @@ class MSIST(Solver):
                     
                 elif self.str_sparse_pen == 'l0rl2_bivar':
                     if s > 0:    
-                        s_parent_us = nabs(self.get_upsampled_parent(s,w_n))**2
+                        s_parent_us = nabs(w_n.get_upsampled_parent(s))**2
                         s_child = nabs(w_n.get_subband(s))**2
                         yi,yi_mask = su.get_neighborhoods(s_child,1) #eq 8, Sendur BSWLVE paper, yzhang code doesn't do this...
                         s_child_norm = sqrt(s_parent_us + s_child)
@@ -152,28 +153,11 @@ class MSIST(Solver):
                         sigma_n = (1.0 / nu[n]**2 * alpha[s] + S_n.get_subband(s))**(-1)
                     # if s < w_n.int_subbands - w_n.int_orientations and s > 0:    
                     if s > 0:    
-                        w_parent_us = self.get_upsampled_parent(s,w_n)
-                        #small_var_mask = s_parent_us**2 < 10*np.mean(s_parent_us**2)
-                        # alpha_dec = small_var_mask * 3.1 + (1-small_var_mask) * 2.25
-                        alpha_dec = .25
-                        # alpha_dec = .5
-                        # alpha_dec = 3.1
-                        w_en = np.abs(w_n.get_subband(s))**2
-                        w_en = 1/4.0*(w_en[0::2,0::2] +
-                                      w_en[1::2,0::2] +
-                                      w_en[0::2,1::2] +
-                                      w_en[1::2,1::2])
+                        w_parent_us = w_n.get_upsampled_parent(s)
+                        alpha_dec = 2.25
                         if s > S_n.int_orientations:
-                            s_child = S_n.get_subband(s-S_n.int_orientations)
-                            s_child = (s_child[0::2,0::2] +
-                                       s_child[1::2,0::2] +
-                                       s_child[0::2,1::2] +
-                                       s_child[1::2,1::2])
-                            b_child = b_n.get_subband(s-S_n.int_orientations)
-                            b_child = (b_child[0::2,0::2] +
-                                             b_child[1::2,0::2] +
-                                             b_child[0::2,1::2] +
-                                             b_child[1::2,1::2])
+                            s_child = S_n.subband_group_sum(s-S_n.int_orientations,'children')
+                            b_child = b_n.subband_group_sum(s-S_n.int_orientations,'children')
                         else:
                             s_child = 0 
                             b_child = 0   
@@ -181,30 +165,26 @@ class MSIST(Solver):
                             ap = ary_a[s+S_n.int_orientations]
                         else:
                             ap = .5
-                        w_en_avg = np.zeros(2*np.array(w_en.shape))
-                        w_en_avg[0::2,0::2] = w_en
-                        w_en_avg[1::2,0::2] = w_en
-                        w_en_avg[0::2,1::2] = w_en
-                        w_en_avg[1::2,1::2] = w_en
-                        #other b estimators
-                        # b_n.set_subband(s,ary_a[s] * 1/2.0*(nabs(w_n.get_subband(s))**2+np.abs(s_parent_us)**2))
-                        # b_n.set_subband(s,ary_a[s] *  (2**(-alpha_dec)) * (np.abs(s_parent_us)**2))
+                        w_en_avg = w_n.subband_group_sum(s,'parent_children')
                         # S_n.set_subband(s, (g_i + 2.0 *  ary_a[s]) / 
                         #                 (nabs(w_n.get_subband(s))**2 + sigma_n + 
                         #                  2.0 * b_n.get_subband(s)))
                         #the standard vbmm b with estimated shape parameter,works with the parent+4 children b
-                        # S_n.set_subband(s, (g_i + 2.0 *  ary_a[s]) / 
-                        #                 (nabs(w_n.get_subband(s))**2 + sigma_n + 
-                        #                  2.0 * b_n.get_subband(s)))
-                        #the vbmm hmt model for s,b, ngk
-                        S_n.set_subband(s, (g_i + 2.0 * ap + ary_a[s]) / 
+                        S_n.set_subband(s, (g_i + 2.0 *  ary_a[s]) / 
                                         (nabs(w_n.get_subband(s))**2 + sigma_n + 
-                                         2.0 * ((2**(-alpha_dec))*b_child + b_n.get_subband(s))))
-                        # the parent+4 children b
-                        # b_n.set_subband(s,ary_a[s] * 1/5.0*(4.0*w_en_avg+np.abs(w_parent_us)**2))
+                                         2.0 * b_n.get_subband(s)))
                         #the vbmm hmt model for s,b, ngk
-                        b_n.set_subband(s,(4*ary_a[s]+ap) /
-                                        (s_child + 2**(-alpha_dec) * S_n.get_subband(s)))
+                        # S_n.set_subband(s, (g_i + 2.0 * ap + ary_a[s]) / 
+                        #                 (nabs(w_n.get_subband(s))**2 + sigma_n + 
+                        #                  2.0 * ((2**(-alpha_dec))*b_child + b_n.get_subband(s))))
+                        # the parent+4 children bs
+                        b_n.set_subband(s,ary_a[s] * w_en_avg)
+                        #the vbmm hmt model for s,b, ngk
+                        # b_n.set_subband(s,(4*ary_a[s]+ap) /
+                        #                 (s_child + 2**(-alpha_dec) * S_n.get_subband(s)))
+                        #other b estimators
+                        # b_n.set_subband(s,ary_a[s] * 1/2.0*(nabs(w_n.get_subband(s))**2+np.abs(w_parent_us)**2))
+                        # b_n.set_subband(s,ary_a[s] *  (2**(-alpha_dec)) * (np.abs(w_parent_us)**2))
                     else: #no parents, so generate fixed-param gammas
                         S_n.set_subband(s, (g_i + 2.0 * ary_a[s]) / 
                                         (nabs(w_n.get_subband(s))**2 + sigma_n +
@@ -305,28 +285,6 @@ class MSIST(Solver):
         print ary_a    
         return ary_a    
 
-    def get_upsampled_parent(self,s,w_n):
-        """Return the upsampled parent layer of subband s
-        """
-        if s+w_n.int_orientations>=w_n.int_subbands:
-            #we actually need to downsample in this case
-            subband_index = 0
-        else:
-            subband_index = s+w_n.int_orientations
-        s_parent = w_n.get_subband(subband_index)
-        if subband_index==0:
-            s_parent_us=1/4.0*(s_parent[0::2,0::2] + 
-                               s_parent[0::2,1::2] + 
-                               s_parent[1::2,0::2] + 
-                               s_parent[1::2,1::2])
-        else:
-            s_parent_us=np.zeros((2*s_parent.shape[0],2*s_parent.shape[1]))
-            #todo: generalize this to arbitrary dimensions
-            s_parent_us[0::2,0::2]=s_parent
-            s_parent_us[0::2,1::2]=s_parent
-            s_parent_us[1::2,0::2]=s_parent
-            s_parent_us[1::2,1::2]=s_parent
-        return s_parent_us
 
     class Factory:
         def create(self,ps_params,str_section):
