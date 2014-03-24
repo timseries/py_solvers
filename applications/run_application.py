@@ -10,6 +10,7 @@ def main():
     ls_app_option=[]
     ls_two_prompts=['application','configuration']
     str_application_dir = ''
+    print 'application/configuration selector, use q to break...\n'
     for str_prompt in ls_two_prompts:
         print 'Select ' + str_prompt + '...\n'
         lgc_valid_entry = 0
