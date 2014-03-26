@@ -12,6 +12,7 @@ import py_utils.signal_utilities.sig_utils as su
 from py_solvers.solver import Solver
 from py_operators.operator import Operator
 from py_operators.operator_comp import OperatorComp
+from py_utils.section_factory import SectionFactory as sf
 
 import scipy.stats as ss
 
@@ -29,8 +30,8 @@ class Classify(Solver):
         if len(self.S.ls_ops)==1: #avoid slow 'eval' in OperatorComp
             self.S = self.S.ls_ops[0] 
         self.classifier_method = self.get_val('method',False)
-        self.feature_sec_in = self.get_val('featuresectioninput',True)
-        self.feature_sec_out = self.get_val('featuresectionoutput',True)
+        self.feature_sec_in = self.get_val('featuresectioninput',False)
+        self.feature_sec_out = self.get_val('featuresectionoutput',False)
         if self.classifier_method=='svc':
             self.clf = svm.SVC()
         elif self.classifier_method=='linearsvc':
@@ -47,9 +48,9 @@ class Classify(Solver):
         S = self.S
         feature_reduce = Scat().reduce #function handle 
         classes = dict_in['x'].keys()
-        if self.x_feature_section != '':
+        if self.feature_sec_in != '':
             sec_input = sf.create_section(self.get_params(),self.feature_sec_in)
-            dict_in['x_feature'] = sec_intput.read()
+            dict_in['x_feature'] = sec_input.read(dict_in,return_val=True)
         else:   
             met_output_obj = sf.create_section(self.get_params(),self.feature_sec_out)
             #generate the features if not previously stored from a prior run,takes a while...
@@ -57,7 +58,7 @@ class Classify(Solver):
             for _class_index,_class in enumerate(classes):
                 print 'generating scattering features for class ' + _class
                 n_samples = len(dict_in['x'][_class])
-                dict_in['x_feature'][_class]=[(S*dict_in['x'][_class][sample]).flatten() for 
+                dict_in['x_feature'][_class]=[feature_reduce((S*dict_in['x'][_class][sample]).flatten()) for 
                                               sample in xrange(n_samples)]
             #update and save
             met_output_obj.update(dict_in)
@@ -76,13 +77,13 @@ class Classify(Solver):
         #generate the training and test data matrix (X) and label vectors (y)
         for _class_index,_class in enumerate(classes):
             for training_index in dict_in['x_train'][_class]:
-                Xtrain[sample_index,:] = feature_reduce(dict_in['y_feature'][_class][training_index])
+                Xtrain[sample_index,:] = (dict_in['x_feature'][_class][training_index])
                 ytrain[sample_index] = dict_in['y_label'][_class]
                 sample_index+=1
         sample_index = 0         
         for _class_index,_class in enumerate(classes):
             for testing_index in dict_in['x_test'][_class]:
-                Xtest[sample_index,:] = feature_reduce(dict_in['y_feature'][_class][testing_index])
+                Xtest[sample_index,:] = (dict_in['x_feature'][_class][testing_index])
                 ytest[sample_index] = dict_in['y_label'][_class]
                 sample_index+=1
         dict_in['y_truth']=ytest
