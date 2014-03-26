@@ -37,7 +37,7 @@ class Classify(Solver):
         elif self.classifier_method=='linearsvc':
             self.clf = svm.LinearSVC()
         else:
-            ValueError('unknown classification method ' + self.classifier_method)    
+            raise ValueError('unknown classification method ' + self.classifier_method)    
         
     def solve(self,dict_in):
         """

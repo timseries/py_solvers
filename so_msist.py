@@ -192,7 +192,7 @@ class MSIST(Solver):
                         b_n.set_subband(s, (p_k + ary_a[s]) / 
                                         (S_n.get_subband(s) + p_theta))
                 else:
-                    ValueError('no such solver variant')
+                    raise ValueError('no such solver variant')
                 #update current solution
                 w_n.set_subband(s, \
                   (alpha[s] * w_n.get_subband(s) + w_resid.get_subband(s)) / \
