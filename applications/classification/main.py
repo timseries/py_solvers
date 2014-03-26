@@ -9,10 +9,8 @@ from py_utils.section_factory import SectionFactory as sf
 
 def main():
     #configuration specification, absolute path
-    # ps_path='/home/tim/repos/py_solvers/applications/deconvolution/uniform_40db_bsnr_cameraman.ini'
-    #ps_path='/home/tim/repos/py_solvers/applications/texture_classification/texture_params.ini'
-    # ps_path='/home/tim/repos/py_solvers/applications/deconvolution/uniform_downsampled_cameraman.ini'
-    ps_path='/home/zelda/tr331/repos/py_solvers/applications/texture_classification/texture_params.ini'
+    ps_path='/home/tim/repos/py_solvers/applications/texture_classification/texture_params.ini'
+    # ps_path='/home/zelda/tr331/repos/py_solvers/applications/texture_classification/texture_params.ini'
     ps_params = ParameterStruct(ps_path)
     dict_in = {}
     sec_input = sf.create_section(ps_params,'Input1')
