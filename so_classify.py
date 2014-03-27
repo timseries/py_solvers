@@ -35,14 +35,14 @@ class Classify(Solver):
         if self.classifier_method=='svc':
             self.clf = svm.SVC()
         elif self.classifier_method=='linearsvc':
-            self.clf = svm.LinearSVC()
+            self.clf = svm.LinearSVC(C=1.0, class_weight=None, dual=False, fit_intercept=True,intercept_scaling=1, loss='l2', multi_class='ovr', penalty='l1',random_state=0, tol=0.0001, verbose=0)
         else:
             raise ValueError('unknown classification method ' + self.classifier_method)    
         
     def solve(self,dict_in):
         """
-        Takes an input object (ground truth, forward model observation, metrics required)
-        Returns a solution object based on the solver this object was instantiated with.
+        Takes an input object (ground truth partitioned classification set),
+        computes features, and classifies.
         """
         super(Classify,self).solve()
         S = self.S
@@ -66,12 +66,12 @@ class Classify(Solver):
 
         #assumes each feature vector is the same size    
         dict_in['feature_vector_size'] = dict_in['x_feature'][classes[0]][-1].size
-        Xtrain = np.zeros([dict_in['n_training_samples'],dict_in['feature_vector_size']]) 
-        Xtest = np.zeros([dict_in['n_testing_samples'],dict_in['feature_vector_size']]) 
+        Xtrain = np.zeros([dict_in['n_training_samples'],dict_in['feature_vector_size']],dtype='double') 
+        Xtest = np.zeros([dict_in['n_testing_samples'],dict_in['feature_vector_size']],dtype='double') 
         
         #vector to hold the training labels
-        ytrain = np.zeros(dict_in['n_training_samples'],)
-        ytest = np.zeros(dict_in['n_testing_samples'],)
+        ytrain = np.zeros(dict_in['n_training_samples'],dtype='int16')
+        ytest = np.zeros(dict_in['n_testing_samples'],dtype='int16')
         sample_index = 0
 
         #generate the training and test data matrix (X) and label vectors (y)
@@ -80,14 +80,21 @@ class Classify(Solver):
                 Xtrain[sample_index,:] = (dict_in['x_feature'][_class][training_index])
                 ytrain[sample_index] = dict_in['y_label'][_class]
                 sample_index+=1
-        sample_index = 0         
+        sample_index = 0
+        ls_testing_index = []
         for _class_index,_class in enumerate(classes):
             for testing_index in dict_in['x_test'][_class]:
                 Xtest[sample_index,:] = (dict_in['x_feature'][_class][testing_index])
                 ytest[sample_index] = dict_in['y_label'][_class]
+                ls_testing_index.append(testing_index)
                 sample_index+=1
+                
         dict_in['y_truth']=ytest
+        dict_in['y_truth_sample_index']=np.array(ls_testing_index,dtype='int16')
 
+        #rescaling X and y, since SVM is not scale invariant
+        # Xtrain /= np.max(Xtrain)
+        # Xtest /= np.max(Xtest)
         #train the model
         self.clf.fit(Xtrain,ytrain)
 
