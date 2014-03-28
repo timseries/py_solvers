@@ -6,7 +6,6 @@ from numpy.linalg import norm
 
 from sklearn import svm
 
-from py_utils.signal_utilities.ws import WS
 from py_utils.signal_utilities.scat import Scat
 import py_utils.signal_utilities.sig_utils as su
 from py_solvers.solver import Solver
@@ -22,7 +21,7 @@ class Classify(Solver):
     """
     def __init__(self,ps_params,str_section):
         """
-        Class constructor for DTCWT
+        Class constructor for Classify
         """
         super(Classify,self).__init__(ps_params,str_section)
         self.S = OperatorComp(ps_params,
@@ -30,6 +29,7 @@ class Classify(Solver):
         if len(self.S.ls_ops)==1: #avoid slow 'eval' in OperatorComp
             self.S = self.S.ls_ops[0] 
         self.classifier_method = self.get_val('method',False)
+        self.feature_redution = self.get_val('featureredution',False)
         self.feature_sec_in = self.get_val('featuresectioninput',False)
         self.feature_sec_out = self.get_val('featuresectionoutput',False)
         if self.classifier_method=='svc':
@@ -48,18 +48,20 @@ class Classify(Solver):
         S = self.S
         feature_reduce = Scat().reduce #function handle 
         classes = dict_in['x'].keys()
-        if self.feature_sec_in != '':
+        if self.feature_sec_in != '': #load the feature vectors from disk
             sec_input = sf.create_section(self.get_params(),self.feature_sec_in)
             dict_in['x_feature'] = sec_input.read(dict_in,return_val=True)
-        else:   
+        else:   #no feature vector file specified, so compute
             met_output_obj = sf.create_section(self.get_params(),self.feature_sec_out)
             #generate the features if not previously stored from a prior run,takes a while...
             #TODO:parallelize
             for _class_index,_class in enumerate(classes):
                 print 'generating scattering features for class ' + _class
                 n_samples = len(dict_in['x'][_class])
-                dict_in['x_feature'][_class]=[feature_reduce((S*dict_in['x'][_class][sample]).flatten()) for 
-                                              sample in xrange(n_samples)]
+                dict_in['x_feature'][_class]=(
+                    [feature_reduce((S*dict_in['x'][_class][sample]).flatten(),
+                                    method='self.feature_redution') for 
+                                    sample in xrange(n_samples)])
             #update and save
             met_output_obj.update(dict_in)
             self.results.save_metric(met_output_obj)
