@@ -32,12 +32,29 @@ class Classify(Solver):
         self.feature_redution = self.get_val('featureredution',False)
         self.feature_sec_in = self.get_val('featuresectioninput',False)
         self.feature_sec_out = self.get_val('featuresectionoutput',False)
-        if self.classifier_method=='svc':
-            self.clf = svm.SVC()
-        elif self.classifier_method=='linearsvc':
-            self.clf = svm.LinearSVC(C=1.0, class_weight=None, dual=False, fit_intercept=True,intercept_scaling=1, loss='l2', multi_class='ovr', penalty='l1',random_state=0, tol=0.0001, verbose=0)
+        if self.classifier_method[-3:]=='svc':
+            kwprefix = 'kwsvc_'
+            if self.classifier_method=='svc':
+                self.clf = svm.SVC
+            elif self.classifier_method=='linearsvc':
+                self.clf = svm.LinearSVC
+            else:
+                raise ValueError('unknown svm method ' + self.classifier_method)    
+            #get the keyword arguments dictionary to pass to the classifier constructor
+            kwargs=self.get_keyword_arguments(kwprefix)
         else:
-            raise ValueError('unknown classification method ' + self.classifier_method)    
+            raise ValueError('unknown classification method ' + self.classifier_method)
+        #manually fix some kwargs which shouldn't be lowercase...
+        fixkeys=['C']
+        for fixkey in fixkeys:
+            if kwargs.has_key(fixkey.lower()):
+                kwargs[fixkey] = kwargs[fixkey.lower()]
+                kwargs.pop(fixkey.lower(),None)
+        #instantiate the classifier    
+        if self.isCallableWithArgs(self.clf.__init__,kwargs):
+            self.clf=self.clf(**kwargs)
+        else:
+            raise ValueError('bad arguments for classifier ' + str(kwargs))    
         
     def solve(self,dict_in):
         """
