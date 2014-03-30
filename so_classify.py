@@ -5,6 +5,7 @@ from numpy.fft import fftn, ifftn
 from numpy.linalg import norm
 
 from sklearn import svm
+from sklearn.decomposition import PCA
 
 from py_utils.signal_utilities.scat import Scat
 import py_utils.signal_utilities.sig_utils as su
@@ -29,7 +30,7 @@ class Classify(Solver):
         if len(self.S.ls_ops)==1: #avoid slow 'eval' in OperatorComp
             self.S = self.S.ls_ops[0] 
         self.classifier_method = self.get_val('method',False)
-        self.feature_redution = self.get_val('featureredution',False)
+        self.feature_reduction = self.get_val('featurereduction',False)
         self.feature_sec_in = self.get_val('featuresectioninput',False)
         self.feature_sec_out = self.get_val('featuresectionoutput',False)
         if self.classifier_method[-3:]=='svc':
@@ -42,6 +43,12 @@ class Classify(Solver):
                 raise ValueError('unknown svm method ' + self.classifier_method)    
             #get the keyword arguments dictionary to pass to the classifier constructor
             kwargs=self.get_keyword_arguments(kwprefix)
+        elif self.classifier_method[-3:]=='pca':
+            kwprefix = 'kwpca_'
+            if self.classifier_method=='affinepca':
+                self.clf = PCA
+            else:
+                raise ValueError('unknown pca method ' + self.classifier_method)    
         else:
             raise ValueError('unknown classification method ' + self.classifier_method)
         #manually fix some kwargs which shouldn't be lowercase...
@@ -77,7 +84,7 @@ class Classify(Solver):
                 n_samples = len(dict_in['x'][_class])
                 dict_in['x_feature'][_class]=(
                     [feature_reduce((S*dict_in['x'][_class][sample]).flatten(),
-                                    method='self.feature_redution') for 
+                                    method=self.feature_reduction) for 
                                     sample in xrange(n_samples)])
             #update and save
             met_output_obj.update(dict_in)
@@ -115,10 +122,24 @@ class Classify(Solver):
         # Xtrain /= np.max(Xtrain)
         # Xtest /= np.max(Xtest)
         #train the model
-        self.clf.fit(Xtrain,ytrain)
-
-        #perform classification
-        dict_in['y_pred']=self.clf.predict(Xtest)
+        dict_in['pca_train']={}
+        if self.classifier_method=='affinepca':
+            #we must fit a model separately for each of the class subspaces
+            for _class_index,_class in enumerate(classes):
+                #xclass_features is n_samples (C) X n_features (\barSx_c)
+                xclass_features=Xtrain[ytrain==dict_in['y_label'][_class],:]
+                xclass_features_mean=np.mean(xclass_features,axis=0)
+                #subtract the mean from each sample scattering vector (rows in xclass_features)
+                #and do pca
+                self.clf.fit(xclass_features)
+                #store the components as a list in the pca_train dict
+                #the first element being the mean, 
+                #the second: the n_features x n_components array of principal components
+                dict_in['pca_train'][_class]=[xclass_features_mean,self.clf._components]
+        else:    
+            self.clf.fit(Xtrain,ytrain)
+            #perform classification/prediction on the test set
+            dict_in['y_pred']=self.clf.predict(Xtest)
         self.results.update(dict_in)
         
     class Factory:
