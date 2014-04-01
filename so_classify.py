@@ -30,7 +30,7 @@ class Classify(Solver):
         self.S = OperatorComp(ps_params,
                               self.get_val('transforms',False))
         if len(self.S.ls_ops)==1: #avoid slow 'eval' in OperatorComp
-            self.S = self.S.ls_ops[0] 
+            self.S = self.S.ls_ops[0]
         self.classifier_method = self.get_val('method',False)
         self.feature_reduction = self.get_val('featurereduction',False)
         self.feature_sec_in = self.get_val('featuresectioninput',False)
@@ -161,12 +161,12 @@ class Classify(Solver):
             #now find the indices corresponding to these mins
             dict_in['y_pred']=np.array([int(np.where(error_mins[j]==error_matrix[j,:])[0])
                                         for j in xrange(error_mins.shape[0])])
+            dict_in['x_model_params']=dict_in['pca_train']
         else:
-            pdb.set_trace()
             self.clf.fit(Xtrain,ytrain)
             #perform classification/prediction on the test set
             dict_in['y_pred']=self.clf.predict(Xtest)
-        dict_in['x_model_params']=self.clf
+            dict_in['x_model_params']=self.clf
         self.results.update(dict_in)
 
     class Factory:
