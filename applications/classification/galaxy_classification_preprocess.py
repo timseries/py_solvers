@@ -17,7 +17,8 @@ from py_utils.section_factory import SectionFactory as sf
 import pdb
 
 def main():
-    strpath='/home/tim/GoogleDrive/timothy.daniel.roberts@gmail.com/PhD/Projects/Classification/Data/GalaxyClassification/'
+    # strpath='/home/tim/GoogleDrive/timothy.daniel.roberts@gmail.com/PhD/Projects/Classification/Data/GalaxyClassification/' #workstation
+    strpath='/home/zelda/tr331/Projects/GalaxyChallenge' #yoshi
     training_dir='images_training_rev1/'
     save_dir='images_training_rev1_formatted/'
     exp_list=['exp1','exp2','exp3','exp4','exp5','exp6','exp7','exp8','exp9','exp10','exp11']
@@ -46,7 +47,7 @@ def main():
         ps_path=strpath+save_dir+'galaxy_params.ini'
         ps_params = ParameterStruct(ps_path)
         S = sf.create_section(ps_params,'Transform2')
-    with open(strpath+'training_solutions_rev1_small.csv', 'rb') as csvfile:
+    with open(strpath+'training_solutions_rev1.csv', 'rb') as csvfile:
         galaxyreader = csv.reader(csvfile)
         count = 0 #to skip the first row
         for row in galaxyreader:
