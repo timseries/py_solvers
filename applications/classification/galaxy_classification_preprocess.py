@@ -1,10 +1,10 @@
+#!/usr/bin/python -tt
 import csv
 import matplotlib.image as mpimg
 import png
 from scipy import misc
 import numpy as np
 import cPickle
-#commented !/usr/bin/python -tt
 #commented #! /home/zelda/tr331/ENV/bin/python
 #commented #$ -S /home/zelda/tr331/ENV/bin/python
 
@@ -19,8 +19,8 @@ import pdb
 def main():
     strpath='/home/tim/GoogleDrive/timothy.daniel.roberts@gmail.com/PhD/Projects/Classification/Data/GalaxyClassification/' #workstation
     # strpath='/home/zelda/tr331/Projects/GalaxyChallenge' #yoshi
-    training_dir='images_training_rev1/'
-    save_dir='images_training_rev1_formatted/'
+    training_dir='images_test_rev1/'
+    save_dir='images_test_rev1_formatted/'
     exp_list=['exp1','exp2','exp3','exp4','exp5','exp6','exp7','exp8','exp9','exp10','exp11']
     for index,exp in enumerate(exp_list):
         exp_list[index]='class_csv_'+exp
@@ -40,17 +40,20 @@ def main():
     tgt_size=[128,128]
     feature_reduce = Scat().reduce #function handle 
     gen_csv=0
-    gen_bw_cropped_images=0
-    gen_feature_vector_files=1
+    gen_bw_cropped_images=1
+    gen_feature_vector_files=0
     if gen_feature_vector_files:
         feature_vector={}#dict, keys are galaxyids'
         ps_path=strpath+save_dir+'galaxy_params.ini'
         ps_params = ParameterStruct(ps_path)
         S = sf.create_section(ps_params,'Transform2')
-    with open(strpath+'training_solutions_rev1.csv', 'rb') as csvfile:
+        #BEGINCOMMENTED SECTION(only for generating training data)
+    with open(strpath+'all_ones_benchmark.csv', 'rb') as csvfile:
         galaxyreader = csv.reader(csvfile)
         count = 0 #to skip the first row
-        for row in galaxyreader:
+        for row in galaxyreader: 
+        #ENDCOMMENTED SECTION(only for generating training data)
+                #BEGINCOMMENTED SECTION(only for generating training data)
             if count == 0:#skip
                 header=row
                 #get the column numbers (as lists) corresponding to each experiment
