@@ -1,14 +1,14 @@
-#! /home/zelda/tr331/ENV/bin/python
-#$ -S /home/zelda/tr331/ENV/bin/python
-
-#ad;lfkja;lfke   !/usr/bin/python -tt
 import csv
 import matplotlib.image as mpimg
 import png
 from scipy import misc
 import numpy as np
 import cPickle
+#commented !/usr/bin/python -tt
+#commented #! /home/zelda/tr331/ENV/bin/python
+#commented #$ -S /home/zelda/tr331/ENV/bin/python
 
+#to run on the gpu  #qsub -l qp=cuda
 from py_utils.signal_utilities.scat import Scat
 from py_utils.parameter_struct import ParameterStruct
 from py_utils.signal_utilities.sig_utils import rgb2gray
@@ -17,8 +17,8 @@ from py_utils.section_factory import SectionFactory as sf
 import pdb
 
 def main():
-    # strpath='/home/tim/GoogleDrive/timothy.daniel.roberts@gmail.com/PhD/Projects/Classification/Data/GalaxyClassification/' #workstation
-    strpath='/home/zelda/tr331/Projects/GalaxyChallenge' #yoshi
+    strpath='/home/tim/GoogleDrive/timothy.daniel.roberts@gmail.com/PhD/Projects/Classification/Data/GalaxyClassification/' #workstation
+    # strpath='/home/zelda/tr331/Projects/GalaxyChallenge' #yoshi
     training_dir='images_training_rev1/'
     save_dir='images_training_rev1_formatted/'
     exp_list=['exp1','exp2','exp3','exp4','exp5','exp6','exp7','exp8','exp9','exp10','exp11']
@@ -40,7 +40,7 @@ def main():
     tgt_size=[128,128]
     feature_reduce = Scat().reduce #function handle 
     gen_csv=0
-    gen_bw_cropped_images=1
+    gen_bw_cropped_images=0
     gen_feature_vector_files=1
     if gen_feature_vector_files:
         feature_vector={}#dict, keys are galaxyids'
