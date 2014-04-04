@@ -17,19 +17,16 @@ from py_utils.section_factory import SectionFactory as sf
 import pdb
 
 def main():
-<<<<<<< HEAD
     # strpath='/home/tim/GoogleDrive/timothy.daniel.roberts@gmail.com/PhD/Projects/Classification/Data/GalaxyClassification/' #workstation
-    strpath='/home/zelda/tr331/Projects/GalaxyChallenge/' #yoshi
+    # strpath='/home/zelda/tr331/Projects/GalaxyChallenge/' #yoshi
     training_dir='images_test_rev1/'
     save_dir='images_test_rev1_formatted/'
-=======
     strpath='/home/tim/GoogleDrive/timothy.daniel.roberts@gmail.com/PhD/Projects/Classification/Data/GalaxyClassification/' #workstation
     # strpath='/home/zelda/tr331/Projects/GalaxyChallenge' #yoshi
     training_dir='images_training_rev1/'
     save_dir='images_training_rev1_formatted/'
     # training_dir='images_test_rev1/'
     # save_dir='images_test_rev1_formatted/'
->>>>>>> cc30da457bb9a8d8d09663cd5c69638bd20ef2f8
     exp_list=['exp1','exp2','exp3','exp4','exp5','exp6','exp7','exp8','exp9','exp10','exp11']
     for index,exp in enumerate(exp_list):
         exp_list[index]='class_csv_'+exp
@@ -48,15 +45,12 @@ def main():
     class_dict[exp_list[10]]=['Class11.1','Class11.2','Class11.3']
     tgt_size=[128,128]
     feature_reduce = Scat().reduce #function handle 
-<<<<<<< HEAD
     gen_csv=0
     gen_bw_cropped_images=0
-    gen_feature_vector_files=1
-=======
+    gen_feature_vector_files=0
     gen_csv=1
     gen_bw_cropped_images=0
     gen_feature_vector_files=0
->>>>>>> cc30da457bb9a8d8d09663cd5c69638bd20ef2f8
     if gen_feature_vector_files:
         feature_vector={}#dict, keys are galaxyids'
         ps_path=strpath+'galaxy_params.ini'

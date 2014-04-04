@@ -138,8 +138,8 @@ class Classify(Solver):
         # Xtest /= np.max(Xtest)
         #train the model
         print 'fitting the model...'
-        dict_in['pca_train']={}
         if self.classifier_method=='affinepca':
+            dict_in['pca_train']={}
             #we must fit a model separately for each of the class subspaces
             for _class_index,_class in enumerate(classes):
                 #xclass_features is n_samples (C) X n_features (\barSx_c)
