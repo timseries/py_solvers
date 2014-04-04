@@ -4,8 +4,9 @@ from numpy import arange, conj, sqrt,median, abs as nabs, exp, maximum as nmax
 from numpy.fft import fftn, ifftn
 from numpy.linalg import norm
 
-from sklearn import svm
+from sklearn import svm,linear_model
 from sklearn.decomposition import PCA
+from sklearn import preprocessing
 
 from py_utils.signal_utilities.scat import Scat
 import py_utils.signal_utilities.sig_utils as su
@@ -36,12 +37,15 @@ class Classify(Solver):
         self.feature_sec_in = self.get_val('featuresectioninput',False)
         self.class_sec_in = self.get_val('classsectioninput',False)
         self.feature_sec_out = self.get_val('featuresectionoutput',False)
+        self.output = self.get_val('output',False)
         if self.classifier_method[-3:]=='svc':
             kwprefix = 'kwsvc_'
             if self.classifier_method=='svc':
                 self.clf = svm.SVC
             elif self.classifier_method=='linearsvc':
                 self.clf = svm.LinearSVC
+            elif self.classifier_method=='linlogregsvc':
+                self.clf = linear_model.LogisticRegression
             else:
                 raise ValueError('unknown svm method ' + self.classifier_method)    
         elif self.classifier_method[-3:]=='pca':
@@ -136,6 +140,10 @@ class Classify(Solver):
         #rescaling X and y, since SVM is not scale invariant
         # Xtrain /= np.max(Xtrain)
         # Xtest /= np.max(Xtest)
+        scaler = preprocessing.StandardScaler().fit(Xtrain)
+        Xtrain=scaler.fit_transform(Xtrain)
+        Xtest=scaler.transform(Xtest)
+        dict_in['x_scaler_params']=scaler
         #train the model
         print 'fitting the model...'
         if self.classifier_method=='affinepca':
@@ -181,9 +189,9 @@ class Classify(Solver):
             self.clf.fit(Xtrain,ytrain)
             #perform classification/prediction on the test set
             print 'making prediction...'
-            if self.classifier_method[-3:]=='svc' and self.clf.get_params()['probability']:
+            if self.output=='probabilities':
                 dict_in['y_pred']=self.clf.predict_proba(Xtest)
-                for index,_class in classes:
+                for index,_class in enumerate(classes):
                     dict_in[_class]=dict_in['y_pred'][:,index]
             else:#non-probabilistic              
                 dict_in['y_pred']=self.clf.predict(Xtest)
