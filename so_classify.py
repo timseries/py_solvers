@@ -34,6 +34,7 @@ class Classify(Solver):
         self.classifier_method = self.get_val('method',False)
         self.feature_reduction = self.get_val('featurereduction',False)
         self.feature_sec_in = self.get_val('featuresectioninput',False)
+        self.class_sec_in = self.get_val('classsectioninput',False)
         self.feature_sec_out = self.get_val('featuresectionoutput',False)
         if self.classifier_method[-3:]=='svc':
             kwprefix = 'kwsvc_'
@@ -77,22 +78,31 @@ class Classify(Solver):
         if self.feature_sec_in != '': #load the feature vectors from disk
             sec_input = sf.create_section(self.get_params(),self.feature_sec_in)
             dict_in['x_feature'] = sec_input.read(dict_in,return_val=True)
+            if self.class_sec_in != '': #the class specification (csv), should already have been read in
+                #now organize dict_in['x_feature'] into classes using dict_in['x']
+                #dict_in['x_feature']['exemplarid']->dict_in['x_feature']['exemplarclass'] 
+                #where dict_in['x_feature']['exemplarclass'] is a list
+                #using pop to avoid copying data
+                print 'organizing classes for this experiment...'
+                for _class in classes:
+                    dict_in['x_feature'][_class]=[]
+                    for _exemplar in dict_in['x'][_class]:
+                        exemplar_feature=dict_in['x_feature'].pop(_exemplar[0])
+                        dict_in['x_feature'][_class].append(exemplar_feature)
         else:   #no feature vector file specified, so compute
             met_output_obj = sf.create_section(self.get_params(),self.feature_sec_out)
             #generate the features if not previously stored from a prior run,takes a while...
-            #TODO:parallelize
             for _class_index,_class in enumerate(classes):
                 print 'generating scattering features for class ' + _class
                 n_samples = len(dict_in['x'][_class])
-                dict_in['x_feature'][_class]=(
-                    [feature_reduce((S*dict_in['x'][_class][sample]).flatten(),
+                dict_in['x_feature'][_class]=([feature_reduce((S*dict_in['x'][_class][sample][1]).flatten(),
                                     method=self.feature_reduction) for 
                                     sample in xrange(n_samples)])
             #update and save
             met_output_obj.update(dict_in)
             self.results.save_metric(met_output_obj)
 
-        #assumes each feature vector is the same size
+        #assumes each feature vector is the same size for all exemplars...
         dict_in['feature_vector_size'] = dict_in['x_feature'][classes[0]][-1].size
         Xtrain = np.zeros([dict_in['n_training_samples'],dict_in['feature_vector_size']],dtype='double')
         Xtest = np.zeros([dict_in['n_testing_samples'],dict_in['feature_vector_size']],dtype='double')
@@ -101,7 +111,7 @@ class Classify(Solver):
         ytrain = np.zeros(dict_in['n_training_samples'],dtype='int16')
         ytest = np.zeros(dict_in['n_testing_samples'],dtype='int16')
         sample_index = 0
-
+        print 'generating training/test data using pre-computed partitions...'
         #generate the training and test data matrix (X) and label vectors (y)
         for _class_index,_class in enumerate(classes):
             for training_index in dict_in['x_train'][_class]:
@@ -110,20 +120,24 @@ class Classify(Solver):
                 sample_index+=1
         sample_index = 0
         ls_testing_index = []
+        ls_exemplar_id = []
         for _class_index,_class in enumerate(classes):
             for testing_index in dict_in['x_test'][_class]:
                 Xtest[sample_index,:] = (dict_in['x_feature'][_class][testing_index])
                 ytest[sample_index] = dict_in['y_label'][_class]
                 ls_testing_index.append(testing_index)
+                ls_exemplar_id.append(dict_in['x'][_class][testing_index][0])
                 sample_index+=1
                 
         dict_in['y_truth']=ytest
         dict_in['y_truth_sample_index']=np.array(ls_testing_index,dtype='int16')
+        dict_in['exemplar_id']=ls_exemplar_id
 
         #rescaling X and y, since SVM is not scale invariant
         # Xtrain /= np.max(Xtrain)
         # Xtest /= np.max(Xtest)
         #train the model
+        print 'fitting the model...'
         dict_in['pca_train']={}
         if self.classifier_method=='affinepca':
             #we must fit a model separately for each of the class subspaces
@@ -159,13 +173,20 @@ class Classify(Solver):
             error_matrix=error_matrix[-1,:,:]    #error matrix is now num_samplesXnum_classes
             error_mins=np.amin(error_matrix,axis=1)#minimum D+1 error along class dimension
             #now find the indices corresponding to these mins
+            print 'making prediction...'
             dict_in['y_pred']=np.array([int(np.where(error_mins[j]==error_matrix[j,:])[0])
                                         for j in xrange(error_mins.shape[0])])
             dict_in['x_model_params']=dict_in['pca_train']
-        else:
+        else:#svm or some other method
             self.clf.fit(Xtrain,ytrain)
             #perform classification/prediction on the test set
-            dict_in['y_pred']=self.clf.predict(Xtest)
+            print 'making prediction...'
+            if self.classifier_method[-3:]=='svc' and self.clf.get_params()['probability']:
+                dict_in['y_pred']=self.clf.predict_proba(Xtest)
+                for index,_class in classes:
+                    dict_in[_class]=dict_in['y_pred'][:,index]
+            else:#non-probabilistic              
+                dict_in['y_pred']=self.clf.predict(Xtest)
             dict_in['x_model_params']=self.clf
         self.results.update(dict_in)
 
