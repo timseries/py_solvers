@@ -19,8 +19,10 @@ import pdb
 def main():
     strpath='/home/tim/GoogleDrive/timothy.daniel.roberts@gmail.com/PhD/Projects/Classification/Data/GalaxyClassification/' #workstation
     # strpath='/home/zelda/tr331/Projects/GalaxyChallenge' #yoshi
-    training_dir='images_test_rev1/'
-    save_dir='images_test_rev1_formatted/'
+    training_dir='images_training_rev1/'
+    save_dir='images_training_rev1_formatted/'
+    # training_dir='images_test_rev1/'
+    # save_dir='images_test_rev1_formatted/'
     exp_list=['exp1','exp2','exp3','exp4','exp5','exp6','exp7','exp8','exp9','exp10','exp11']
     for index,exp in enumerate(exp_list):
         exp_list[index]='class_csv_'+exp
@@ -39,16 +41,16 @@ def main():
     class_dict[exp_list[10]]=['Class11.1','Class11.2','Class11.3']
     tgt_size=[128,128]
     feature_reduce = Scat().reduce #function handle 
-    gen_csv=0
+    gen_csv=1
     gen_bw_cropped_images=0
-    gen_feature_vector_files=1
+    gen_feature_vector_files=0
     if gen_feature_vector_files:
         feature_vector={}#dict, keys are galaxyids'
         ps_path=strpath+'galaxy_params.ini'
         ps_params = ParameterStruct(ps_path)
         S = sf.create_section(ps_params,'Transform2')
         #BEGINCOMMENTED SECTION(only for generating training data)
-    with open(strpath+'all_ones_benchmark.csv', 'rb') as csvfile:
+    with open(strpath+'training_solutions_rev1.csv', 'rb') as csvfile:
         galaxyreader = csv.reader(csvfile)
         count = 0 #to skip the first row
         for row in galaxyreader: 
@@ -67,7 +69,7 @@ def main():
                         with open(strpath+exp+'.csv', 'ab') as csvfile2:
                             expwriter = csv.writer(csvfile2)
                             #pull out the probabilities corresponding to each class
-                            class_probs=np.array([row[column] for column in class_cols[exp]])
+                            class_probs=np.array([np.float(row[column]) for column in class_cols[exp]])
                             #find the maximal class 
                             _class=class_dict[exp][np.argmax(class_probs)]
                             #output the maximal class
