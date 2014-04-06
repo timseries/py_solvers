@@ -34,6 +34,7 @@ class MSIST(Solver):
             self.W = self.W.ls_ops[0] 
         self.alpha = self.get_val('alpha',True)
         self.alpha_method = self.get_val('alphamethod',False)
+        self.spatial_threshold = self.get_val('spatialthreshold',True)
         if self.alpha_method=='':
             self.alpha_method = 'spectrum'
         self.str_group_structure = self.get_val('grouptypes',False)
@@ -68,6 +69,7 @@ class MSIST(Solver):
             self.alpha = su.spectral_radius(self.W,self.H,dict_in['x_0'].shape,self.alpha_method)
         alpha = self.alpha    
         w_n = W * x_n
+        #initialize the precision matrix
         S_n = WS(np.zeros(w_n.ary_lowpass.shape),(w_n.one_subband(0)).tup_coeffs) #initialize the variance matrix as a ws object
         #every variant does these
         dict_in['w_n'] = w_n
@@ -94,38 +96,58 @@ class MSIST(Solver):
                 ary_a = self.get_gamma_shapes(W * dict_in['x_0'])
             for s in arange(w_n.int_subbands):
                 b_n.set_subband(s, p_b_0)
-        #begin iterations here
+            adj_factor = 1.3
+    
+        #poisson-corrupted gaussiang noise, using the scaling coefficients in the regularization (MSIST-P)
+        if (self.str_sparse_pen == 'poisson_deblur'):
+            #need a 0-padded y to get the right size for the scaling coefficients
+            y_hat = fftn(dict_in['y'] - b) #need a different yhat for the iterations...
+            w_y = (W*dict_in['y_padded'])
+        #perform initial (n=0) update of the results
         self.results.update(dict_in)
-        adj_factor = 1.3
+        #begin iterations here for the MSIST algorithm
         for n in np.arange(self.int_iterations):
-            # if np.mod(n,100)==0:
+            #doing blurring in the fourier domain explicitly here, this save some transforms in the next step
             H.set_output_fourier(True)
+            #Landweber difference
             f_resid = ifftn(y_hat - H * x_n)
             H.set_output_fourier(False)
+            #Landweber projection back to spatial domain
             w_resid = W * (~H * f_resid)
+            #the bivariate shrinkage penalty in l0rl2 (coefficient neighborhood averags)
             if self.str_sparse_pen == 'l0rl2_bivar' and n==0:
                 sigsq_n = self.get_val('nustop', True)**2
                 sig_n = sqrt(sigsq_n)
                 sqrt3=sqrt(3.0)
+            #update each of the wavelet subbands separatly, starting at the 
+            #coarsest and working to finer scales
+            #While this can be done as a single vector operation, that would
+            #require a sparse version of \Lambda_{\alpha} with many entries copied
+            #without much performance gain over this for loop
+            ary_p_var=0 #this is zero for all variance, except the poisson deblurring
             for s in xrange(w_n.int_subbands-1,-1,-1):
-                #variance estimate
-                if self.str_sparse_pen == 'l0rl2': #msist
+                #variance estimate depends on the version of msist {l0rl2,l0rl2_bivar,vbmm,vbmm_hmt,poisson_deblur)
+                #this gives different sparse penalties
+                if self.str_sparse_pen == 'l0rl2': #basic msist algorithm
                     S_n.set_subband(s,(1.0 / ((1.0 / g_i) * nabs(w_n.get_subband(s))**2 + epsilon[n]**2)))
-                    
+                if self.str_sparse_pen == 'poisson_deblur': #msist with poisson-corrupted noise, 
+                    if s==0:
+                        ary_p_var = w_y.ary_lowpass
+                    else:
+                        int_level, int_orientation = w_n.lev_ori_from_subband(s)
+                        ary_p_var = w_y.downsample_scaling(int_level)
+                    S_n.set_subband(s,(1.0 / ((1.0 / g_i) * nabs(w_n.get_subband(s))**2 + epsilon[n]**2)))
                 elif self.str_sparse_pen == 'l0rl2_bivar':
                     if s > 0:    
                         s_parent_us = nabs(w_n.get_upsampled_parent(s))**2
                         s_child = nabs(w_n.get_subband(s))**2
                         yi,yi_mask = su.get_neighborhoods(s_child,1) #eq 8, Sendur BSWLVE paper, yzhang code doesn't do this...
                         s_child_norm = sqrt(s_parent_us + s_child)
-                        if 1:#n==0:#np.mod(n,20)==0:    
-                            sigsq_y = np.sum(yi,axis=yi.ndim-1)/np.sum(yi_mask,axis=yi.ndim-1)#still eq 8...
-                            # sigsq_y = s_child
-                            sig = sqrt(np.maximum(sigsq_y-sigsq_n,0))
-                            w_tilde.set_subband(s, sqrt3*sigsq_n/sig) #the thresholding fn
+                        sigsq_y = np.sum(yi,axis=yi.ndim-1)/np.sum(yi_mask,axis=yi.ndim-1)#still eq 8...
+                        sig = sqrt(np.maximum(sigsq_y-sigsq_n,0))
+                        w_tilde.set_subband(s, sqrt3*sigsq_n/sig) #the thresholding fn
                         thresh = np.maximum(s_child_norm - w_tilde.get_subband(s),0)/s_child_norm #eq 5
-                        
-                        if np.mod(n,2)==0:    
+                        if np.mod(n,2)==0:    #update with the bivariate thresholded coefficients on every other iteration
                             S_n.set_subband(s,(1.0 / 
                                                ((1.0 / g_i) *  
                                                 nabs(thresh * w_n.get_subband(s))**2 + (epsilon[n]**2))))
@@ -196,9 +218,15 @@ class MSIST(Solver):
                 #update current solution
                 w_n.set_subband(s, \
                   (alpha[s] * w_n.get_subband(s) + w_resid.get_subband(s)) / \
-                  (alpha[s] + (nu[n]**2) * S_n.get_subband(s)))
+                  (alpha[s] + (nu[n]**2+ary_p_var) * S_n.get_subband(s)))
             x_n = ~W * w_n
-            w_n = W * x_n #reprojection, to put our iterate in the range space, prevent drifting
+            if self.str_sparse_pen=='poisson_deblur':
+                if self.spatial_threshold:
+                    x_n[x_n<b]=0
+                #this iterate x_n has had it's padding removed, re-pad for next itn
+                x_n=pad(x_n,dict_in['x_0'].shape)
+            #reprojection, to put our iterate in the transform range space, prevent 'drifting'
+            w_n = W * x_n 
             dict_in['x_n'] = x_n
             dict_in['w_n'] = w_n
             #update results
