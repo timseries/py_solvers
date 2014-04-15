@@ -60,7 +60,7 @@ fun_val=zeros(iter,1);
 count=0;
 if verbose
   fprintf('\t\t****************************************\n');
-  fprintf('\t\t** Deconvolution with Richardson-Lucy **\n');
+  fprintf('\t\t** Deconvolution with MSIST-P **\n');
   fprintf('\t\t****************************************\n');
   fprintf('#iter       fun-val      relative-dif     ISNR\t  RSNR\t   NMISE\t  SSIM_mean\t   SSIM_min\n')
   fprintf('==========================================================================================\n');

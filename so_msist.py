@@ -34,7 +34,7 @@ class MSIST(Solver):
             self.W = self.W.ls_ops[0] 
         self.alpha = self.get_val('alpha',True)
         self.alpha_method = self.get_val('alphamethod',False)
-        self.spatial_threshold = self.get_val('spatialthreshold',True)
+        self.spatial_threshold = self.get_val('spatialthreshold',True)#for poisson deblurring only
         if self.alpha_method=='':
             self.alpha_method = 'spectrum'
         self.str_group_structure = self.get_val('grouptypes',False)
@@ -49,7 +49,7 @@ class MSIST(Solver):
         W = self.W
         #input data 
         y_hat = fftn(dict_in['y'])
-        x_n = dict_in['x_0'].copy()
+        x_n = dict_in['x_0'].copy() #initial solution
         dict_in['x_n'] = x_n
         #group structure
         if self.str_group_structure == 'self':
@@ -101,13 +101,15 @@ class MSIST(Solver):
         #poisson-corrupted gaussiang noise, using the scaling coefficients in the regularization (MSIST-P)
         if (self.str_sparse_pen == 'poisson_deblur'):
             #need a 0-padded y to get the right size for the scaling coefficients
+            b = dict_in['b']
             y_hat = fftn(dict_in['y'] - b) #need a different yhat for the iterations...
             w_y = (W*dict_in['y_padded'])
+            w_y_scaling_coeffs=w_y.downsample_scaling()
         #perform initial (n=0) update of the results
         self.results.update(dict_in)
         #begin iterations here for the MSIST algorithm
         for n in np.arange(self.int_iterations):
-            #doing blurring in the fourier domain explicitly here, this save some transforms in the next step
+            #doing fourier domain operation explicitly here, this save some transforms in the next step
             H.set_output_fourier(True)
             #Landweber difference
             f_resid = ifftn(y_hat - H * x_n)
@@ -135,7 +137,7 @@ class MSIST(Solver):
                         ary_p_var = w_y.ary_lowpass
                     else:
                         int_level, int_orientation = w_n.lev_ori_from_subband(s)
-                        ary_p_var = w_y.downsample_scaling(int_level)
+                        ary_p_var = w_y_scaling_coeffs[int_level]
                     S_n.set_subband(s,(1.0 / ((1.0 / g_i) * nabs(w_n.get_subband(s))**2 + epsilon[n]**2)))
                 elif self.str_sparse_pen == 'l0rl2_bivar':
                     if s > 0:    
@@ -223,10 +225,11 @@ class MSIST(Solver):
             if self.str_sparse_pen=='poisson_deblur':
                 if self.spatial_threshold:
                     x_n[x_n<b]=0
-                #this iterate x_n has had it's padding removed, re-pad for next itn
-                x_n=pad(x_n,dict_in['x_0'].shape)
+                #need to reset the border of this iterate for the next implicit convolution
+                x_n=su.crop_center(x_n,dict_in['y'].shape)
+                x_n=su.pad_center(x_n,dict_in['x_0'].shape)
             #reprojection, to put our iterate in the transform range space, prevent 'drifting'
-            w_n = W * x_n 
+            w_n = W * x_n
             dict_in['x_n'] = x_n
             dict_in['w_n'] = w_n
             #update results
