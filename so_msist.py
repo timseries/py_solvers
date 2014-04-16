@@ -11,7 +11,6 @@ from py_operators.operator import Operator
 from py_operators.operator_comp import OperatorComp
 
 import scipy.stats as ss
-import pdb
 
 class MSIST(Solver):
     """
