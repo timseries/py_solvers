@@ -103,9 +103,11 @@ class MSIST(Solver):
             b = dict_in['b']
             y_hat = fftn(dict_in['y'] - b) #need a different yhat for the iterations...
             w_y = (W*dict_in['y_padded'])
+            dict_in['x_n']=su.crop_center(x_n,dict_in['y'].shape)
             w_y_scaling_coeffs=w_y.downsample_scaling()
         #perform initial (n=0) update of the results
         self.results.update(dict_in)
+        print 'Finished itn: n=' + str(0)
         #begin iterations here for the MSIST algorithm
         for n in np.arange(self.int_iterations):
             #doing fourier domain operation explicitly here, this save some transforms in the next step
@@ -222,17 +224,21 @@ class MSIST(Solver):
                   (alpha[s] + (nu[n]**2+ary_p_var) * S_n.get_subband(s)))
             x_n = ~W * w_n
             if self.str_sparse_pen=='poisson_deblur':
-                if self.spatial_threshold:
-                    x_n[x_n<b]=0
-                #need to reset the border of this iterate for the next implicit convolution
+                #need to remove the invalid border of this iterate
                 x_n=su.crop_center(x_n,dict_in['y'].shape)
-                x_n=su.pad_center(x_n,dict_in['x_0'].shape)
-            #reprojection, to put our iterate in the transform range space, prevent 'drifting'
-            w_n = W * x_n
+                #remove the background
+                if self.spatial_threshold:
+                    x_n[x_n<0]=0.0
             dict_in['x_n'] = x_n
+            #reprojection, to put our iterate in the transform range space, prevent 'drifting'
+            #need to reset the border of this iterate for the next implicit convolution
+            if self.str_sparse_pen=='poisson_deblur':
+                x_n=su.pad_center(x_n,dict_in['x_0'].shape)
+            w_n = W * x_n
             dict_in['w_n'] = w_n
             #update results
             self.results.update(dict_in)
+            print 'Finished itn: n=' + str(n+1)
         return dict_in
 
     def get_epsilon_nu(self):
