@@ -19,8 +19,8 @@ import pdb
 def main():
     # strpath='/home/tim/GoogleDrive/timothy.daniel.roberts@gmail.com/PhD/Projects/Classification/Data/GalaxyClassification/' #workstation
     # strpath='/home/zelda/tr331/Projects/GalaxyChallenge/' #yoshi
-    training_dir='images_test_rev1/'
-    save_dir='images_test_rev1_formatted/'
+    # training_dir='images_training_rev1/'
+    # save_dir='images_training_rev1_formatted/'
     strpath='/home/tim/GoogleDrive/timothy.daniel.roberts@gmail.com/PhD/Projects/Classification/Data/GalaxyClassification/' #workstation
     # strpath='/home/zelda/tr331/Projects/GalaxyChallenge' #yoshi
     training_dir='images_training_rev1/'
@@ -42,12 +42,9 @@ def main():
     class_dict[exp_list[7]]=['Class8.1','Class8.2','Class8.3','Class8.4','Class8.5','Class8.6','Class8.7']
     class_dict[exp_list[8]]=['Class9.1','Class9.2','Class9.3']
     class_dict[exp_list[9]]=['Class10.1','Class10.2','Class10.3']
-    class_dict[exp_list[10]]=['Class11.1','Class11.2','Class11.3']
+    class_dict[exp_list[10]]=['Class11.1','Class11.2','Class11.3','Class11.4','Class11.5','Class11.6']
     tgt_size=[128,128]
     feature_reduce = Scat().reduce #function handle 
-    gen_csv=0
-    gen_bw_cropped_images=0
-    gen_feature_vector_files=0
     gen_csv=1
     gen_bw_cropped_images=0
     gen_feature_vector_files=0

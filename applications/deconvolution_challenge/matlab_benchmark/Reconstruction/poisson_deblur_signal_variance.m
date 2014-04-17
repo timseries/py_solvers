@@ -3,41 +3,6 @@ import mat_operators.*;
 import mat_utils.*;
 import mat_utils.results.*;
 
-%Image deblurring with Richardson-Lucy algorithm.
-
-% ========================== INPUT PARAMETERS (required) ==================
-% Parameters    Values  description
-% =========================================================================
-% y             Noisy blured image.
-% h             Blur kernel (PSF).
-% ======================== OPTIONAL INPUT PARAMETERS ======================
-% Parameters    Values description
-% =========================================================================
-% img           Original Image. (For the compution of the Quality metrics)
-% imgb          Blurred Image (For the compution of the Normalized mean 
-%               integrated squared error). It is the third output argument
-%               of the ForwardModel3D.m
-% x_init        Initial guess for x. (Default: [])
-% iter          Number of iterations (Default: 100)
-% tol           Stopping threshold: Relative normed difference between two
-%               successive iterations (Default:1e-5)
-% verbose       If verbose is set on then info for each iteration is
-%               printed on screen. (Default: false)
-% showfig       If showfig is set to true, the maximum intensity projection 
-%               of the result of the deconvolution in each iteration is 
-%               shown on screen. (Default: false)
-% b             Constant value for the background (Default: 0)
-% K             constants in the SSIM index formula (see ssim_index.m).
-%               default value: K = [0.01 0.03]
-% window        local window for statistics (see ssim_index.m). default 
-%               window is Gaussian given by window = fspecial('gaussian', 11, 1.5);
-% L             dynamic range of the images. default: max(X2(:))-min(X2(:))
-% ismetric      If ismetric is set to true then the quality metrics are
-%               computed for every iteration. (Default: false) (Note: If
-%               this option is set to true the script can be very slow)
-% =========================================================================
-
-%Author: stamatis.lefkimmiatis@epfl.ch (Biomedical Imaging Group)
 
 [x_init,iter,verbose,showfig,tol,img,imgb,K,window,L,ismetric,W,parameters]=...
   process_options(varargin,'x_init',[],'iter',100,'verbose',true,...
@@ -95,7 +60,7 @@ fun_val=zeros(iter,1);
 count=0;
 if verbose
   fprintf('\t\t****************************************\n');
-  fprintf('\t\t** Deconvolution with Richardson-Lucy **\n');
+  fprintf('\t\t** Deconvolution with MSIST-P **\n');
   fprintf('\t\t****************************************\n');
   fprintf('#iter       fun-val      relative-dif     ISNR\t  RSNR\t   NMISE\t  SSIM_mean\t   SSIM_min\n')
   fprintf('==========================================================================================\n');
