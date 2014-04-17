@@ -1,4 +1,4 @@
-#commented !/usr/bin/python -tt
+#comment !/usr/bin/python -tt
 """
 Python script to prompt the user with a number of applications. Then allow selecting the configuration.
 """
