@@ -15,7 +15,7 @@ import itertools
 
 def main():
     #configuration specification, absolute path
-    ps_path='~/repos/py_solvers/applications/deconvolution_challenge/p0.ini'
+    ps_path='~/repos/py_solvers/applications/deconvolution_challenge/p0_eval.ini'
     ps_params = ParameterStruct(ps_path)
     dict_in = {}
     sec_input = sf.create_section(ps_params,'Input1')
