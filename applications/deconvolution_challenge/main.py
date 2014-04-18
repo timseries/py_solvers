@@ -1,6 +1,6 @@
-#! /home/zelda/tr331/ENVNOSITE/bin/python
-#$ -S /home/zelda/tr331/ENVNOSITE/bin/python
-#comment!/usr/bin/python -tt
+#!/usr/bin/python -tt
+#comment! /home/zelda/tr331/ENVNOSITE/bin/python
+#comment$ -S /home/zelda/tr331/ENVNOSITE/bin/python
 """
 Python script to prompt the user with a number of applications. Then allow selecting the configuration.
 """
@@ -15,7 +15,7 @@ import itertools
 
 def main():
     #configuration specification, absolute path
-    ps_path='~/repos/py_solvers/applications/deconvolution_challenge/p0_eval.ini'
+    ps_path='~/repos/py_solvers/applications/deconvolution_challenge/p1.ini'
     ps_params = ParameterStruct(ps_path)
     dict_in = {}
     sec_input = sf.create_section(ps_params,'Input1')
