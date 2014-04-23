@@ -52,9 +52,6 @@ class RichardsonLucy(Solver):
             div=dict_in['y']/(H*x_n+b)
             div[div==np.nan]=0.0
             x_n = ((~H) * div) * x_n / gamma
-            if np.mod(n,10)==0:
-                output_tiff=TIFFimage(dict_in['x_n'].astype('float32'))
-                output_tiff.write_file('p0_itn' + str(n) + '.tif')
             dict_in['x_n'] = x_n
             #update results
             self.results.update(dict_in)

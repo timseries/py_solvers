@@ -1,4 +1,4 @@
 from so_msist import MSIST
 # from so_poisson_deblur import PoissonDeblur
 from so_classify import Classify
-# from so_richardson_lucy import RichardsonLucy
+from so_richardson_lucy import RichardsonLucy
