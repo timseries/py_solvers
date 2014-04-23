@@ -28,7 +28,7 @@ class RichardsonLucy(Solver):
         super(RichardsonLucy,self).__init__(ps_parameters,str_section)
         self.str_solver_variant = self.get_val('solvervariant',False)
         self.H = OperatorComp(ps_parameters,self.get_val('modalities',False))
-        self.H = self.H.ls_operators[0] #assume we just have one transform
+        self.H = self.H.ls_ops[0] #assume we just have one transform
         self.str_group_structure = self.get_val('grouptypes',False)
         
             
