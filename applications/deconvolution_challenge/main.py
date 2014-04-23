@@ -28,7 +28,7 @@ def main():
     
     #regularization parameter sweep    
     nustart_factors=(1,)
-    nustop_factors=(.5,)
+    nustop_factors=(.2,)
     # nustart_factors=(1,2,3) #really {1.5,3,4.5}*sigma_g
     # nustop_factors=(1,.7,.5) #really {1,.7,.5}*sigma_g
     ls_nu_factors=[nustart_factors,nustop_factors]
