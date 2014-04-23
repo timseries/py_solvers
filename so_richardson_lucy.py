@@ -11,7 +11,7 @@ from scipy.optimize import fmin_ncg as ncg
 from numpy.linalg import norm
 from libtiff import TIFFimage
 
-from py_utils.signal_utilities.sig_utils import crop
+from py_utils.signal_utilities.sig_utils import crop_center
 
 #profiling and debugging stuff
 from py_utils.timer import Timer
@@ -43,7 +43,7 @@ class RichardsonLucy(Solver):
         x_n = dict_in['x_0'].copy()
         b = dict_in['b']#background
         sigma_sq = dict_in['noisevariance']
-        dict_in['x_n'] = x_n
+        dict_in['x_n'] = su.crop_center(x_n,dict_in['y'].shape)
         gamma = (~H)*np.ones(dict_in['y'].shape)
         #begin iterations here
         self.results.update(dict_in)
@@ -52,7 +52,9 @@ class RichardsonLucy(Solver):
             div=dict_in['y']/(H*x_n+b)
             div[div==np.nan]=0.0
             x_n = ((~H) * div) * x_n / gamma
+            x_n=su.crop_center(x_n,dict_in['y'].shape)
             dict_in['x_n'] = x_n
+            x_n=su.pad_center(x_n,dict_in['x_0'].shape)
             #update results
             self.results.update(dict_in)
         return dict_in
