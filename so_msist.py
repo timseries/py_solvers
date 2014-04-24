@@ -105,6 +105,13 @@ class MSIST(Solver):
             w_y = (W*dict_in['y_padded'])
             dict_in['x_n']=su.crop_center(x_n,dict_in['y'].shape)
             w_y_scaling_coeffs=w_y.downsample_scaling()
+        if (self.str_sparse_pen == 'poisson_deblur_sp'):
+            #need a 0-padded y to get the right size for the scaling coefficients
+            b = dict_in['b']
+            y_hat = fftn(dict_in['y'] - b) #need a different yhat for the iterations...
+            w_y = (W*dict_in['y_padded'])
+            dict_in['x_n']=su.crop_center(x_n,dict_in['y'].shape)
+            w_y_scaling_coeffs=w_y.downsample_scaling()
         #perform initial (n=0) update of the results
         self.results.update(dict_in)
         print 'Finished itn: n=' + str(0)
@@ -114,6 +121,8 @@ class MSIST(Solver):
             H.set_output_fourier(True)
             #Landweber difference
             f_resid = ifftn(y_hat - H * x_n)
+            if (self.str_sparse_pen == 'poisson_deblur_sp'):#spatial domain thresholding goes here
+                f_resid/=(dict_in['y']+nu[n]**2)
             H.set_output_fourier(False)
             #Landweber projection back to spatial domain
             w_resid = W * (~H * f_resid)
@@ -133,12 +142,14 @@ class MSIST(Solver):
                 #this gives different sparse penalties
                 if self.str_sparse_pen == 'l0rl2': #basic msist algorithm
                     S_n.set_subband(s,(1.0 / ((1.0 / g_i) * nabs(w_n.get_subband(s))**2 + epsilon[n]**2)))
-                if self.str_sparse_pen == 'poisson_deblur': #msist with poisson-corrupted noise, 
-                    if s==0:
-                        ary_p_var = w_y.ary_lowpass
-                    else:
-                        int_level, int_orientation = w_n.lev_ori_from_subband(s)
-                        ary_p_var = w_y_scaling_coeffs[int_level]
+                elif self.str_sparse_pen[:7] == 'poisson':
+                    if 1: #self.str_sparse_pen == 'poisson_deblur': #msist with poisson-corrupted noise, 
+                        if s==0:
+                            ary_p_var = w_y.ary_lowpass
+                        else:
+                            int_level, int_orientation = w_n.lev_ori_from_subband(s)
+                            ary_p_var = w_y_scaling_coeffs[int_level]
+                        ary_p_var[ary_p_var<=0]=.01
                     S_n.set_subband(s,(1.0 / ((1.0 / g_i) * nabs(w_n.get_subband(s))**2 + epsilon[n]**2)))
                 elif self.str_sparse_pen == 'l0rl2_bivar':
                     if s > 0:    
@@ -219,9 +230,15 @@ class MSIST(Solver):
                 else:
                     raise ValueError('no such solver variant')
                 #update current solution
-                w_n.set_subband(s, \
-                  (alpha[s] * w_n.get_subband(s) + w_resid.get_subband(s)) / \
-                  (alpha[s] + (nu[n]**2+ary_p_var) * S_n.get_subband(s)))
+                if (self.str_sparse_pen == 'poisson_deblur_sp'):#spatial domain thresholding goes here
+                    w_n.set_subband(s, \
+                      (alpha[s] * w_n.get_subband(s) + w_resid.get_subband(s)) / \
+                      (alpha[s] + S_n.get_subband(s)))
+                else:  
+                    w_n.set_subband(s, \
+                      (alpha[s] * w_n.get_subband(s) + w_resid.get_subband(s)) / \
+                      (alpha[s] + (nu[n]**2+ary_p_var) * S_n.get_subband(s)))
+                #end updating subbands   
             x_n = ~W * w_n
             if self.str_sparse_pen=='poisson_deblur':
                 #need to remove the invalid border of this iterate

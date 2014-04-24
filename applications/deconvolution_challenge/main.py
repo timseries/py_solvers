@@ -27,8 +27,12 @@ def main():
     so_solver = sf.create_section(ps_params,'Solver1')
     
     #regularization parameter sweep    
+    # nustart_factors=(1,)
+    # nustop_factors=(.1,)
+
     nustart_factors=(1,)
-    nustop_factors=(.2,)
+    nustop_factors=(.1,)
+    
     # nustart_factors=(1,2,3) #really {1.5,3,4.5}*sigma_g
     # nustop_factors=(1,.7,.5) #really {1,.7,.5}*sigma_g
     ls_nu_factors=[nustart_factors,nustop_factors]
