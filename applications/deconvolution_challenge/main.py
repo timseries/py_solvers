@@ -40,7 +40,7 @@ def main():
     nu_stop = so_solver.get_val('nustop', True)
     epsilon_start = so_solver.get_val('epsilonstart', True)
     epsilon_stop = so_solver.get_val('epsilonstop', True)
-    alpha=so_solver.get_val('alpha', True)
+    alpha=so_solver.alpha
     ls_alpha_keys=['alpha']
     ls_nu_keys=['nustart','nustop']
     ls_epsilon_keys=['epsilonstart','epsilonstop']
