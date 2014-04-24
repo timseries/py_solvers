@@ -26,16 +26,15 @@ def main():
     sec_observe.observe(dict_in)
     so_solver = sf.create_section(ps_params,'Solver1')
     
-    #regularization parameter sweep    
-    # nustart_factors=(1,)
-    # nustop_factors=(.1,)
+    #regularization parameter sweep (no parameters)
+    nustart_factors=(1,)
+    nustop_factors=(.7,)
 
-    # nustart_factors=(1,)
-    # nustop_factors=(.1,)
-    
-    nustart_factors=(1,.9,.8,.7,.6) #really {1.5,3,4.5}*sigma_g
+    #alpha sweep
+    # nustart_factors=(1,.9,.8,.7,.6) #really {1.5,3,4.5}*sigma_g
     # nustop_factors=(.5,.2,.1,.01,.01) #really {1,.7,.5}*sigma_g
-    nustop_factors=(.5) #really {1,.7,.5}*sigma_g
+    # nustop_factors=(.5) #really {1,.7,.5}*sigma_g
+    
     ls_nu_factors=[nustart_factors,nustop_factors]
     nu_start = so_solver.get_val('nustart', True)
     nu_stop = so_solver.get_val('nustop', True)
@@ -46,14 +45,19 @@ def main():
     ls_nu_keys=['nustart','nustop']
     ls_epsilon_keys=['epsilonstart','epsilonstop']
     for nu_multiplier in itertools.product(*ls_nu_factors):
-    
-        ls_nu_vals=[nu_start,.5*nu_stop]
-        # ls_epsilon_vals=[nu_multiplier[0]*epsilon_start,nu_multiplier[1]*epsilon_stop]
-        ls_alpha_vals=[nu_multiplier[0]*alpha]
-        ls_alpha_vals[0][0]=1.0
+        #nu sweep
+        ls_nu_vals=[nu_multiplier[0]*nu_start,nu_multiplier[0]*nu_stop]
         ps_params.set_key_val_pairs('Solver1',ls_nu_keys,ls_nu_vals)
+
+        #epsilon sweep
+        # ls_epsilon_vals=[nu_multiplier[0]*epsilon_start,nu_multiplier[1]*epsilon_stop]
         # ps_params.set_key_val_pairs('Solver1',ls_epsilon_keys,ls_epsilon_vals)
-        ps_params.set_key_val_pairs('Solver1',ls_alpha_keys,ls_alpha_vals)
+
+        #alpha sweep
+        # ls_alpha_vals=[nu_multiplier[0]*alpha]
+        # ls_alpha_vals[0][0]=1.0
+        # ps_params.set_key_val_pairs('Solver1',ls_alpha_keys,ls_alpha_vals)
+
         #create the solver and solve
         so_solver = sf.create_section(ps_params,'Solver1')
         so_solver.solve(dict_in)
