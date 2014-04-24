@@ -47,10 +47,10 @@ def main():
     for nu_multiplier in itertools.product(*ls_nu_factors):
         ls_nu_vals=[nu_multiplier[0]*nu_start,nu_multiplier[1]*nu_stop]
         ls_epsilon_vals=[nu_multiplier[0]*epsilon_start,nu_multiplier[1]*epsilon_stop]
+        ls_alpha_vals=[nu_multiplier[0]*alpha]
         ps_params.set_key_val_pairs('Solver1',ls_nu_keys,ls_nu_vals)
         ps_params.set_key_val_pairs('Solver1',ls_epsilon_keys,ls_epsilon_vals)
-        ls_alpha_vals=[nu_multiplier[0]*alpha]
-        ps_params.set_key_val_pairs('Solver1',ls_alpha_keys,ls_epsilon_vals)
+        ps_params.set_key_val_pairs('Solver1',ls_alpha_keys,ls_alpha_vals)
         #create the solver and solve
         so_solver = sf.create_section(ps_params,'Solver1')
         so_solver.solve(dict_in)
