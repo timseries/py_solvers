@@ -245,7 +245,7 @@ class MSIST(Solver):
                 x_n=su.crop_center(x_n,dict_in['y'].shape)
                 #remove the background
                 if self.spatial_threshold:
-                    x_n[x_n<0]=0.0
+                    x_n[x_n<b]=0.0
             dict_in['x_n'] = x_n
             #reprojection, to put our iterate in the transform range space, prevent 'drifting'
             #need to reset the border of this iterate for the next implicit convolution
