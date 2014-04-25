@@ -3,7 +3,7 @@
 import mat_operators.*;
 import mat_utils.*;
 import mat_utils.results.*;
-psParameters=ParameterStruct('/home/tim/repos/py_solvers/applications/deconvolution_challenge/p0.ini');
+psParameters=ParameterStruct('/home/tim/repos/py_solvers/applications/deconvolution_challenge/p1.ini');
 W=operatorFactory(psParameters,'Transform1');
 stcInput1 = psParameters.getSection('Input1');
 stcInput2 = psParameters.getSection('Input2');
@@ -44,19 +44,19 @@ ary_ground_truth_padded = imreadstack([str_dir str_measurements str_case_padded]
 %ary_psf = imreadstack([str_dir str_psfs str_case '_psf.tif']);
 ary_psf = imreadstack([str_dir str_psfs str_psf]);
 %0
-mp = 239.6;
-b = 15.8;
-stdev = 9.7;
-seed = 1;
+% mp = 239.6;
+% b = 15.8;
+% stdev = 9.7;
+% seed = 1;
 
 nu = 9;
 epsilon = 20;
 decay=.9;
 %1
-%mp = 342.4;
-%b = 7.8;
-%stdev = 3.1;
-%seed = 1;
+mp = 342.4;
+b = 7.8;
+stdev = 3.1;
+seed = 1;
 
 %2
 %mp = 289.8;
@@ -87,8 +87,8 @@ y = double(y);
 
 W.lgcAdjoint=0;
 %[x0,fun_val,QS]=sparse_poisson_deblur(y,ary_psf,'img',f,'imgb',fb,'iter',100,'verbose',true,'showfig',false,'ismetric',true,'nu',nu,'epsilon',epsilon,'decay',decay,'W',W,'b',b); 
-%sfigure;[x0,fun_val,QS]=RLdeblur3D(y,ary_psf,'img',f,'imgb',fb,'iter',100,'verbose',true,'showfig',true,'ismetric',true,'nu',nu,'epsilon',epsilon,'decay',decay,'W',W,'b',b); 
-[x0,fun_val,QS]=poisson_deblur_signal_variance(y,ary_psf,'img',f,'imgb',fb,'iter',100,'verbose',true,'showfig',true,'ismetric',true,'W',W,'parameters',psParameters); 
+sfigure;[x0,fun_val,QS]=RLdeblur3D(y,ary_psf,'img',f,'imgb',fb,'iter',70,'verbose',true,'showfig',true,'ismetric',true,'nu',nu,'epsilon',epsilon,'decay',decay,'W',W,'b',b); 
+% [x0,fun_val,QS]=poisson_deblur_signal_variance(y,ary_psf,'img',f,'imgb',fb,'iter',100,'verbose',true,'showfig',true,'ismetric',true,'W',W,'parameters',psParameters); 
 
 
 %for eval

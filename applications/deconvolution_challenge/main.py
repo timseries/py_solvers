@@ -15,7 +15,7 @@ import itertools
 
 def main():
     #configuration specification, absolute path
-    ps_path='~/repos/py_solvers/applications/deconvolution_challenge/p2.ini'
+    ps_path='~/repos/py_solvers/applications/deconvolution_challenge/p3.ini'
     ps_params = ParameterStruct(ps_path)
     dict_in = {}
     sec_input = sf.create_section(ps_params,'Input1')
@@ -26,9 +26,14 @@ def main():
     sec_observe.observe(dict_in)
     so_solver = sf.create_section(ps_params,'Solver1')
     
-    #regularization parameter sweep (no parameters)
-    nustart_factors=(1,)
-    nustop_factors=(.7,)
+    #works for p0,p1,p2
+    # nustart_factors=(1,)
+    # nustop_factors=(.7,)
+
+
+    #case p3
+    nustart_factors=(.8,)
+    nustop_factors=(.5,)
 
     #alpha sweep
     # nustart_factors=(1,.9,.8,.7,.6) #really {1.5,3,4.5}*sigma_g
@@ -46,7 +51,7 @@ def main():
     ls_epsilon_keys=['epsilonstart','epsilonstop']
     for nu_multiplier in itertools.product(*ls_nu_factors):
         #nu sweep
-        ls_nu_vals=[nu_multiplier[0]*nu_start,nu_multiplier[0]*nu_stop]
+        ls_nu_vals=[nu_multiplier[0]*nu_start,nu_multiplier[1]*nu_stop]
         ps_params.set_key_val_pairs('Solver1',ls_nu_keys,ls_nu_vals)
 
         #epsilon sweep
