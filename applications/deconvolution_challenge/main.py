@@ -46,7 +46,7 @@ def main():
     ls_epsilon_keys=['epsilonstart','epsilonstop']
     for nu_multiplier in itertools.product(*ls_nu_factors):
         #nu sweep
-        ls_nu_vals=[nu_multiplier[0]*nu_start,nu_multiplier[0]*nu_stop]
+        ls_nu_vals=[nu_multiplier[0]*nu_start,nu_multiplier[1]*nu_stop]
         ps_params.set_key_val_pairs('Solver1',ls_nu_keys,ls_nu_vals)
 
         #epsilon sweep
