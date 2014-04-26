@@ -33,7 +33,7 @@ def main():
 
     #case p3
     nustart_factors=(1,)#1.1,1.2,1.3,1.4)
-    nustop_factors=(.5,)
+    nustop_factors=(.2,)
 
     #alpha sweep
     # nustart_factors=(1,.9,.8,.7,.6) #really {1.5,3,4.5}*sigma_g
@@ -59,9 +59,9 @@ def main():
         # ps_params.set_key_val_pairs('Solver1',ls_epsilon_keys,ls_epsilon_vals)
 
         #alpha sweep
-        ls_alpha_vals=[1.1*alpha]
-        ls_alpha_vals[0][0]=1.0
-        ps_params.set_key_val_pairs('Solver1',ls_alpha_keys,ls_alpha_vals)
+        # ls_alpha_vals=[1.1*alpha]
+        # ls_alpha_vals[0][0]=1.0
+        # ps_params.set_key_val_pairs('Solver1',ls_alpha_keys,ls_alpha_vals)
 
         #create the solver and solve
         so_solver = sf.create_section(ps_params,'Solver1')
