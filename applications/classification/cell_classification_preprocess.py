@@ -30,18 +30,32 @@ def main():
                 #open the cell
                 celldata=mpimg.imread(traincellfile) 
                 cellmaskdata=mpimg.imread(traincellmaskfile) 
-                newcell=np.zeros(tgt_size)
-                #paste in the masked data centered roughly in the new image
-                st0=(tgt_size[0]-celldata.shape[0])/2
-                st1=(tgt_size[1]-celldata.shape[1])/2
-                SL0=slice(st0,st0+celldata.shape[0],None)
-                SL1=slice(st1,st1+celldata.shape[1],None)
-                newcell[SL0,SL1]=celldata*cellmaskdata
+                newcell=adjust_size(celldata,cellmaskdata,tgt_size)
                 f = open(savecellfile,'wb')
                 w = png.Writer(*(newcell.shape[1],newcell.shape[0]),greyscale=True)
                 w.write(f,newcell/np.max(newcell)*255)
                 f.close()
             count+=1
-            
+
+def adjust_size(cell_data,cell_mask_data,tgt_size):            
+    newcell=np.zeros(tgt_size)
+    #paste in the masked data centered roughly in the new image
+    st0=np.abs((tgt_size[0]-cell_data.shape[0])/2)
+    st1=np.abs((tgt_size[1]-cell_data.shape[1])/2)
+    if cell_data.shape[0]>tgt_size[0]:
+        SL0crop=slice(st0,st0+tgt_size[0],None)
+        SL0new=slice(0,None,None)
+    else:    
+        SL0crop=slice(0,None,None)
+        SL0new=slice(st0,st0+cell_data.shape[0],None)
+    if cell_data.shape[1]>tgt_size[1]:
+        SL1crop=slice(st1,st1+tgt_size[1],None)
+        SL1new=slice(0,None,None)
+    else:
+        SL1crop=slice(0,None,None)
+        SL1new=slice(st1,st1+cell_data.shape[1],None)
+    newcell[SL0new,SL1new]=(cell_data*cell_mask_data)[SL0crop,SL1crop]
+    return newcell
+                            
 if __name__ == "__main__":
     main()

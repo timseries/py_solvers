@@ -15,7 +15,7 @@ import itertools
 
 def main():
     #configuration specification, absolute path
-    ps_path='~/repos/py_solvers/applications/deconvolution_challenge/p3.ini'
+    ps_path='~/repos/py_solvers/applications/deconvolution_challenge/p1.ini'
     ps_params = ParameterStruct(ps_path)
     dict_in = {}
     sec_input = sf.create_section(ps_params,'Input1')
@@ -27,13 +27,13 @@ def main():
     so_solver = sf.create_section(ps_params,'Solver1')
     
     #works for p0,p1,p2
-    # nustart_factors=(1,)
-    # nustop_factors=(.7,)
+    nustart_factors=(1,)
+    nustop_factors=(.7,)
 
 
     #case p3
-    nustart_factors=(1,)#1.1,1.2,1.3,1.4)
-    nustop_factors=(.2,)
+    #nustart_factors=(1,)#1.1,1.2,1.3,1.4)
+    #nustop_factors=(.2,)
 
     #alpha sweep
     # nustart_factors=(1,.9,.8,.7,.6) #really {1.5,3,4.5}*sigma_g
@@ -45,7 +45,7 @@ def main():
     nu_stop = so_solver.get_val('nustop', True)
     epsilon_start = so_solver.get_val('epsilonstart', True)
     epsilon_stop = so_solver.get_val('epsilonstop', True)
-    alpha=so_solver.alpha
+    #alpha=so_solver.alpha
     ls_alpha_keys=['alpha']
     ls_nu_keys=['nustart','nustop']
     ls_epsilon_keys=['epsilonstart','epsilonstop']
