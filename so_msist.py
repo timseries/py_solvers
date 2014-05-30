@@ -70,7 +70,7 @@ class MSIST(Solver):
         w_n = W * x_n
         #initialize the precision matrix
         S_n = WS(np.zeros(w_n.ary_lowpass.shape),(w_n.one_subband(0)).tup_coeffs) #initialize the variance matrix as a ws object
-        #every variant does these
+        #every variant does these next steps
         dict_in['w_n'] = w_n
         epsilon,nu = self.get_epsilon_nu()
         dict_in['nu_sq'] = nu**2
@@ -80,6 +80,25 @@ class MSIST(Solver):
             #the thresholds which is saved 
             w_tilde = WS(np.zeros(w_n.ary_lowpass.shape),
                          (w_n.one_subband(0)).tup_coeffs)
+            sqrt3=sqrt(3.0)
+        #l0rl2_group specific
+        if self.str_sparse_pen == 'l0rl2_group':
+            #initialize the cluster averaging matrix, A
+            tau = self.get_val('tau',True)
+            A = sf.create_section(ps_params,self.get_val('clusteraverage',False))
+            tausq_AtA = (tau**2)*(A.A.transpose()*A.A)
+            G = sf.create_section(ps_params,self.get_val('groupaverage',False))
+            #the non-overlapping space is just a list of ws objects
+            #copy the initial ws object here
+            ls_w_n_hat = [WS(w_n.ary_lowpass,w_n.tup_coeffs)
+                          for int_dup in xrange(A.duplicates)]
+            dict_in['ls_w_n_hat'] =  ls_w_n_hat
+            ls_S_n_hat = [WS(S_n.ary_lowpass,S_n.tup_coeffs)
+                          for int_dup in xrange(A.duplicates)]
+            dict_in['ls_S_n_hat'] = ls_S_n_hat
+            w_n_bar = WS(w_n.ary_lowpass,w_n.tup_coeffs)
+            dict_in['w_n_bar'] = w_n_bar
+            del S_n
         #vbmm specific
         if (self.str_sparse_pen == 'vbmm' or  #vbmm    
             self.str_sparse_pen == 'vbmm_hmt'):
@@ -130,7 +149,6 @@ class MSIST(Solver):
             if self.str_sparse_pen == 'l0rl2_bivar' and n==0:
                 sigsq_n = self.get_val('nustop', True)**2
                 sig_n = sqrt(sigsq_n)
-                sqrt3=sqrt(3.0)
             #update each of the wavelet subbands separatly, starting at the 
             #coarsest and working to finer scales
             #While this can be done as a single vector operation, that would
@@ -171,7 +189,9 @@ class MSIST(Solver):
                                                 nabs(w_n.get_subband(s))**2 + (epsilon[n]**2))))
                     else:
                         S_n.set_subband(s,(1.0 / ((1.0 / g_i) * nabs(w_n.get_subband(s))**2 + epsilon[n]**2)))
-                        
+                elif self.str_sparse_pen == 'l0rl2_group': #msist-g
+                    #dummy update...do updates later
+                    ls_S_n_hat=ls_S_n_hat
                 elif self.str_sparse_pen == 'vbmm': #vbmm    
                     if n == 0:
                         sigma_n = 0
@@ -234,10 +254,31 @@ class MSIST(Solver):
                     w_n.set_subband(s, \
                       (alpha[s] * w_n.get_subband(s) + w_resid.get_subband(s)) / \
                       (alpha[s] + S_n.get_subband(s)))
-                else:  
+                elif (self.str_sparse_pen == 'poisson_deblur'):
                     w_n.set_subband(s, \
                       (alpha[s] * w_n.get_subband(s) + w_resid.get_subband(s)) / \
                       (alpha[s] + (nu[n]**2+ary_p_var) * S_n.get_subband(s)))
+                elif (self.str_sparse_pen == 'l0rl2_group'):
+                   
+                    ls_S_n_hat=G*[w_n_hat.energy() for w_n_hat in ls_w_n_hat] #eq 11
+                    ls_S_n_hat=[S_n_hat.sum(epsilon**2) for S_n_hat in ls_S_n_hat] #eq 11
+                    ls_S_n_hat=[S_n_hat.invert() for S_n_hat in ls_S_n_hat] #eq 19
+                    #TODO:store ls_S_n_hat in csr_matrix S_n_hat_csr, which is not necessarily diagonal in this implementation...
+                    ls_w_n_hat=(tau**2*(~A)*w_n) #eq 21
+                    #TODOflatten ls_w_n_hat to w_n_hat_flat
+                    w_n_hat_flat=((tausq_AtA + (nu**2)*S_n_hat_csr)**(-1))*w_n_hat_flat #eq 21 contd
+                    #TODOstore w_n_hat_flat back in ls_w_n_hat
+                    w_n_bar=A*ls_w_n_hat #eq 13
+                    w_n.set_subband(s, 
+                      (alpha[s] * w_n.get_subband(s) + w_resid.get_subband(s) + 
+                       (tau**2)*w_n_bar.get_subband(s)) /
+                       (alpha[s] + tau**2))
+                    #reprojection for the duplicated vectors
+                    ls_w_n_hat = [W*(~W)*w_n_hat for w_n_hat in ls_w_n_hat]
+                else:
+                    w_n.set_subband(s, \
+                      (alpha[s] * w_n.get_subband(s) + w_resid.get_subband(s)) / \
+                      (alpha[s] + (nu[n]**2) * S_n.get_subband(s)))
                 #end updating subbands   
             x_n = ~W * w_n
             if self.str_sparse_pen=='poisson_deblur':
