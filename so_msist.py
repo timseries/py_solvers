@@ -3,6 +3,8 @@ import numpy as np
 from numpy import arange, conj, sqrt,median, abs as nabs, exp, maximum as nmax
 from numpy.fft import fftn, ifftn
 from numpy.linalg import norm
+from scipy.sparse import csr_matrix
+from scipy.sparse.linalg import inv
 
 from py_utils.signal_utilities.ws import WS
 import py_utils.signal_utilities.sig_utils as su
@@ -259,22 +261,27 @@ class MSIST(Solver):
                       (alpha[s] * w_n.get_subband(s) + w_resid.get_subband(s)) / \
                       (alpha[s] + (nu[n]**2+ary_p_var) * S_n.get_subband(s)))
                 elif (self.str_sparse_pen == 'l0rl2_group'):
-                   
                     ls_S_n_hat=G*[w_n_hat.energy() for w_n_hat in ls_w_n_hat] #eq 11
                     ls_S_n_hat=[S_n_hat.sum(epsilon**2) for S_n_hat in ls_S_n_hat] #eq 11
                     ls_S_n_hat=[S_n_hat.invert() for S_n_hat in ls_S_n_hat] #eq 19
-                    #TODO:store ls_S_n_hat in csr_matrix S_n_hat_csr, which is not necessarily diagonal in this implementation...
-                    ls_w_n_hat=(tau**2*(~A)*w_n) #eq 21
-                    #TODOflatten ls_w_n_hat to w_n_hat_flat
-                    w_n_hat_flat=((tausq_AtA + (nu**2)*S_n_hat_csr)**(-1))*w_n_hat_flat #eq 21 contd
-                    #TODOstore w_n_hat_flat back in ls_w_n_hat
+                    ary_S_n_hat=su.flatten_list(ls_S_n_hat)
+                    ary_diag=np.arange(S_n_hat_length)
+                    S_n_hat_sz=ary_S_n_hat.size
+                    S_n_hat_csr=csr_matrix((su.flatten_list(),(ary_diag,ary_diag)), shape=(S_n_hat_sz,S_n_hat_sz))
+                    ls_w_n_hat=(~A)*(tau**2)*w_n #eq 21
+                    w_n_hat_flat=su.flatten_list(ls_w_n_hat)
+                    w_n_hat_flat=inv(tausq_AtA + (nu**2)*S_n_hat_csr)*w_n_hat_flat #eq 21 contd
+                    ls_w_n_hat_unflat=su.unflatten_list(w_n_hat_flat)
+                    ws_dummy=WS(np.zeros(w_n.ary_lowpass.shape),(w_n.one_subband(0)).tup_coeffs)
+                    ws_dummy.flatten()
+                    ls_w_n_hat=[ws_dummy.unflatten(w_n_hat_unflat)+0 for w_n_hat_unflat in ls_w_n_hat_unflat]
                     w_n_bar=A*ls_w_n_hat #eq 13
                     w_n.set_subband(s, 
                       (alpha[s] * w_n.get_subband(s) + w_resid.get_subband(s) + 
                        (tau**2)*w_n_bar.get_subband(s)) /
                        (alpha[s] + tau**2))
                     #reprojection for the duplicated vectors
-                    ls_w_n_hat = [W*(~W)*w_n_hat for w_n_hat in ls_w_n_hat]
+                    ls_w_n_hat = [W*((~W)*w_n_hat) for w_n_hat in ls_w_n_hat]
                 else:
                     w_n.set_subband(s, \
                       (alpha[s] * w_n.get_subband(s) + w_resid.get_subband(s)) / \
