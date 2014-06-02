@@ -11,6 +11,7 @@ import py_utils.signal_utilities.sig_utils as su
 from py_solvers.solver import Solver
 from py_operators.operator import Operator
 from py_operators.operator_comp import OperatorComp
+from py_utils.section_factory import SectionFactory as sf
 
 import scipy.stats as ss
 
@@ -87,20 +88,23 @@ class MSIST(Solver):
         if self.str_sparse_pen == 'l0rl2_group':
             #initialize the cluster averaging matrix, A
             tau = self.get_val('tau',True)
-            A = sf.create_section(ps_params,self.get_val('clusteraverage',False))
-            tausq_AtA = (tau**2)*(A.A.transpose()*A.A)
-            G = sf.create_section(ps_params,self.get_val('groupaverage',False))
             #the non-overlapping space is just a list of ws objects
             #copy the initial ws object here
+            A = sf.create_section(self.ps_parameters,self.get_val('clusteraverage',False))
+            G = sf.create_section(self.ps_parameters,self.get_val('groupaverage',False))
             ls_w_n_hat = [WS(w_n.ary_lowpass,w_n.tup_coeffs)
                           for int_dup in xrange(A.duplicates)]
-            dict_in['ls_w_n_hat'] =  ls_w_n_hat
-            ls_S_n_hat = [WS(S_n.ary_lowpass,S_n.tup_coeffs)
+            dict_in['ls_w_n_hat'] = ls_w_n_hat
+            ls_S_hat_n = [WS(S_n.ary_lowpass,S_n.tup_coeffs)
                           for int_dup in xrange(A.duplicates)]
-            dict_in['ls_S_n_hat'] = ls_S_n_hat
+            dict_in['ls_S_hat_n'] = ls_S_hat_n
             w_n_bar = WS(w_n.ary_lowpass,w_n.tup_coeffs)
             dict_in['w_n_bar'] = w_n_bar
-            del S_n
+            A*ls_w_n_hat #to initialize A and G
+            G*ls_w_n_hat
+            #precompute tau^2*AtA
+            tausq_AtA = (tau**2)*(A.A.transpose()*A.A)
+            del S_n #don't need this, since we are using S_hat_n
         #vbmm specific
         if (self.str_sparse_pen == 'vbmm' or  #vbmm    
             self.str_sparse_pen == 'vbmm_hmt'):
@@ -193,7 +197,7 @@ class MSIST(Solver):
                         S_n.set_subband(s,(1.0 / ((1.0 / g_i) * nabs(w_n.get_subband(s))**2 + epsilon[n]**2)))
                 elif self.str_sparse_pen == 'l0rl2_group': #msist-g
                     #dummy update...do updates later
-                    ls_S_n_hat=ls_S_n_hat
+                    ls_S_hat_n=ls_S_hat_n
                 elif self.str_sparse_pen == 'vbmm': #vbmm    
                     if n == 0:
                         sigma_n = 0
@@ -261,19 +265,20 @@ class MSIST(Solver):
                       (alpha[s] * w_n.get_subband(s) + w_resid.get_subband(s)) / \
                       (alpha[s] + (nu[n]**2+ary_p_var) * S_n.get_subband(s)))
                 elif (self.str_sparse_pen == 'l0rl2_group'):
-                    ls_S_n_hat=G*[w_n_hat.energy() for w_n_hat in ls_w_n_hat] #eq 11
-                    ls_S_n_hat=[S_n_hat.sum(epsilon**2) for S_n_hat in ls_S_n_hat] #eq 11
-                    ls_S_n_hat=[S_n_hat.invert() for S_n_hat in ls_S_n_hat] #eq 19
-                    ary_S_n_hat=su.flatten_list(ls_S_n_hat)
-                    ary_diag=np.arange(S_n_hat_length)
-                    S_n_hat_sz=ary_S_n_hat.size
-                    S_n_hat_csr=csr_matrix((su.flatten_list(),(ary_diag,ary_diag)), shape=(S_n_hat_sz,S_n_hat_sz))
-                    ls_w_n_hat=(~A)*(tau**2)*w_n #eq 21
+                    ls_S_hat_n=G*[w_n_hat.energy() for w_n_hat in ls_w_n_hat] #eq 11
+                    ls_S_hat_n=[S_hat_n.sum(epsilon**2) for S_hat_n in ls_S_hat_n] #eq 11
+                    ls_S_hat_n=[S_hat_n.invert() for S_hat_n in ls_S_hat_n] #eq 19
+                    ary_S_hat_n=su.flatten_list(ls_S_hat_n)
+                    ary_diag=np.arange(S_hat_n_length)
+                    S_hat_n_sz=ary_S_hat_n.size
+                    S_hat_n_csr=csr_matrix((su.flatten_list(),(ary_diag,ary_diag)), shape=(S_hat_n_sz,S_hat_n_sz))
+                    ls_w_n_hat=(~A)*((tau**2)*w_n) #eq 21
                     w_n_hat_flat=su.flatten_list(ls_w_n_hat)
-                    w_n_hat_flat=inv(tausq_AtA + (nu**2)*S_n_hat_csr)*w_n_hat_flat #eq 21 contd
+                    w_n_hat_flat=inv(tausq_AtA + (nu**2)*S_hat_n_csr)*w_n_hat_flat #eq 21 contd
                     ls_w_n_hat_unflat=su.unflatten_list(w_n_hat_flat)
                     ws_dummy=WS(np.zeros(w_n.ary_lowpass.shape),(w_n.one_subband(0)).tup_coeffs)
                     ws_dummy.flatten()
+                    #the +0 in the next line returns a new WS object...
                     ls_w_n_hat=[ws_dummy.unflatten(w_n_hat_unflat)+0 for w_n_hat_unflat in ls_w_n_hat_unflat]
                     w_n_bar=A*ls_w_n_hat #eq 13
                     w_n.set_subband(s, 
