@@ -119,7 +119,9 @@ class MSIST(Solver):
             ls_S_hat_n_sup=su.unflatten_list(D.transpose()*(WS(np.zeros(w_n.ary_lowpass.shape),(w_n.one_subband(0)).tup_coeffs)+1).flatten(),A.duplicates)
             ls_S_hat_n_sup=[WS(np.zeros(w_n.ary_lowpass.shape),(w_n.one_subband(0)).tup_coeffs).unflatten(S_hat_n_sup)
                             for S_hat_n_sup in ls_S_hat_n_sup]
+            ls_S_hat_n_sup=[S_hat_n_sup.nonzero() for S_hat_n_sup in ls_S_hat_n_sup]
             tausq_AtA = (tau**2)*(A.A.transpose()*A.A).tocsr()
+            del D #don't need this anymore, update rules only depend on A
             del S_n #don't need this, since we are using S_hat_n
         #vbmm specific
         if (self.str_sparse_pen == 'vbmm' or  #vbmm    
@@ -180,21 +182,18 @@ class MSIST(Solver):
             if self.str_sparse_pen == 'l0rl2_group':
                   #calculate S_hat_n, eq 11 and 19
                 ls_S_hat_n=G*[w_n_hat.energy() for w_n_hat in ls_w_n_hat] #eq 11
-                ls_S_hat_n=[ls_S_hat_n[j]+(epsilon[n]**2) for j in xrange(len(ls_S_hat_n))] #eq 11
-                ls_S_hat_n=[ls_S_hat_n_sup[j]*(ls_S_hat_n[j].invert()) for j in xrange(len(ls_S_hat_n))] #eq 19
+                ls_S_hat_n=[ls_S_hat_n_sup[j]*(ls_S_hat_n[j]+epsilon[n]**2).invert() for j in xrange(len(ls_S_hat_n))] #eq 11
                 ary_S_hat_n=su.flatten_list(ls_S_hat_n)
-                ary_S_hat_n[np.isnan(ary_S_hat_n)]=0
+                # ary_S_hat_n[np.isnan(ary_S_hat_n)]=0 #shouldn't have nan
                 S_hat_n_sz=ary_S_hat_n.size
                 ary_diag=np.nonzero(ary_S_hat_n)[0]
                 S_hat_n_csr=csr_matrix((ary_S_hat_n[ary_S_hat_n!=0],(ary_diag,ary_diag)), shape=(S_hat_n_sz,S_hat_n_sz))
                 ls_w_n_hat=(~A)*(w_n*(tau**2)) #eq 21
                 w_n_hat_flat=su.flatten_list(ls_w_n_hat)
-                pdb.set_trace()
-                w_n_hat_flat=su.inv_block_diag(tausq_AtA + (nu[n]**2)*S_hat_n_csr)*w_n_hat_flat #eq 21 contd
+                w_n_hat_flat=su.inv_block_diag(tausq_AtA + (nu[n]**2)*S_hat_n_csr,dict_in)*w_n_hat_flat #eq 21 contd
                 print 'finished inverting'
-                ls_w_n_hat_unflat=su.unflatten_list(w_n_hat_flat)
+                ls_w_n_hat_unflat=su.unflatten_list(w_n_hat_flat,A.duplicates)
                 ws_dummy=WS(np.zeros(w_n.ary_lowpass.shape),(w_n.one_subband(0)).tup_coeffs)
-                ws_dummy.flatten()
                 #the +0 in the next line returns a new WS object...
                 ls_w_n_hat=[ws_dummy.unflatten(w_n_hat_unflat)+0 for w_n_hat_unflat in ls_w_n_hat_unflat]
                 w_n_bar=A*ls_w_n_hat #eq 13
@@ -304,7 +303,6 @@ class MSIST(Solver):
                       (alpha[s] * w_n.get_subband(s) + w_resid.get_subband(s)) / \
                       (alpha[s] + (nu[n]**2+ary_p_var) * S_n.get_subband(s)))
                 elif (self.str_sparse_pen == 'l0rl2_group'):
-
                     w_n.set_subband(s, 
                       (alpha[s] * w_n.get_subband(s) + w_resid.get_subband(s) + 
                        (tau**2)*w_n_bar.get_subband(s)) /
