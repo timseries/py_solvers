@@ -57,8 +57,8 @@ class MSIST(Solver):
         W = self.W
         #input data 
         y_hat = fftn(dict_in['y'])
-        # x_n = dict_in['x_0'].copy() #initial solution
-        x_n = dict_in['x'].copy() #initial solution, for debugging
+        x_n = dict_in['x_0'].copy() #initial solution
+        # x_n = dict_in['x'].copy() #initial solution, for debugging
         dict_in['x_n'] = x_n
         #group structure
         if self.str_group_structure == 'self':
@@ -130,6 +130,7 @@ class MSIST(Solver):
             #initialize S_hat_bar parameters for efficient matrix inverses
             Shatbar_p_filename=A.file_path.split('.')[0]+'Shatbar.pkl'
             if not os.path.isfile(Shatbar_p_filename):
+                dict_in['col_offset']=A.int_size
                 S_hat_n_csr=su.flatten_list_to_csr(ls_S_hat_sup)
                 su.inv_block_diag(tausq_AtA+S_hat_n_csr,dict_in)
                 #save the file
@@ -146,15 +147,16 @@ class MSIST(Solver):
             dict_in['w_bar_n']=w_bar_n
             dict_in['G']=G
             dict_in['A']=A
+            dict_in['W']=W
             dict_in['tausq_AtA']=tausq_AtA
             dict_in['ls_S_hat_sup']=ls_S_hat_sup
             self.update_duplicates(dict_in,nu[0],epsilon[0],tau)    
             w_bar_n=dict_in['w_bar_n'] 
             ls_w_hat_n=dict_in['ls_w_hat_n']
             ls_S_hat_n=dict_in['ls_S_hat_n']
-            pdb.set_trace()
+            # pdb.set_trace()
             del D #don't need this anymore, update rules only depend on A
-            del S_n #don't need this, since we are using S_hat_n
+            # del S_n #don't need this, since we are using S_hat_n
         #vbmm specific
         if (self.str_sparse_pen == 'vbmm' or  #vbmm    
             self.str_sparse_pen == 'vbmm_hmt'):
@@ -246,7 +248,8 @@ class MSIST(Solver):
                     else:
                         S_n.set_subband(s,(1.0 / ((1.0 / g_i) * nabs(w_n.get_subband(s))**2 + epsilon[n]**2)))
                 elif self.str_sparse_pen == 'l0rl2_group': #msist-g, Shat is updated before this loop
-                    ls_S_hat_n=ls_S_hat_n #does nothing
+                    if s==0:
+                        S_n.set_subband(s,(1.0 / ((1.0 / g_i) * nabs(w_n.get_subband(s))**2 + epsilon[n]**2)))
                 elif self.str_sparse_pen == 'vbmm': #vbmm    
                     if n == 0:
                         sigma_n = 0
@@ -317,10 +320,10 @@ class MSIST(Solver):
                         w_n.set_subband(s,
                                         (alpha[s] * w_n.get_subband(s) + w_resid.get_subband(s) + 
                                          (tau**2)*w_bar_n.get_subband(s)) / (alpha[s] + tau**2))
-                    # else: #a standard msist update for the lowpass coeffs
-                    #     w_n.set_subband(s, \
-                    #                     (alpha[s] * w_n.get_subband(s) + w_resid.get_subband(s)) / \
-                    #                     (alpha[s] + (nu[n]**2) * S_n.get_subband(s)))
+                    else: #a standard msist update for the lowpass coeffs
+                        w_n.set_subband(s, \
+                                        (alpha[s] * w_n.get_subband(s) + w_resid.get_subband(s)) / \
+                                        (alpha[s] + (nu[n]**2) * S_n.get_subband(s)))
                 else: 
                     w_n.set_subband(s, \
                       (alpha[s] * w_n.get_subband(s) + w_resid.get_subband(s)) / \
@@ -343,8 +346,11 @@ class MSIST(Solver):
             # pdb.set_trace()
             #reprojection for the duplicated variables of l0rl2_group variant
             if self.str_sparse_pen == 'l0rl2_group':
-                # ls_w_hat_n = [W*((~W)*w_n_hat) for w_n_hat in ls_w_hat_n]
-                # w_bar_n = W*((~W)*w_bar_n)
+                if n==0:
+                    w_0=W*dict_in['x_0']
+                ls_w_hat_n = [ls_w_hat_n[j]*ls_S_hat_sup[j]+w_n*((ls_S_hat_sup[j]+(-1))*(-1)) for j in xrange(len(ls_w_hat_n))]
+                ls_w_hat_n = [W*((~W)*w_hat_n) for w_hat_n in ls_w_hat_n]
+                w_bar_n = W*((~W)*w_bar_n)
                 dict_in['w_bar_n']=w_bar_n
                 dict_in['ls_w_hat_n']=ls_w_hat_n
             dict_in['w_n'] = w_n
@@ -391,15 +397,17 @@ class MSIST(Solver):
         w_n=dict_in['w_n']
         G=dict_in['G']
         A=dict_in['A']
+        W=dict_in['W']
         tausq_AtA=dict_in['tausq_AtA']
         ls_S_hat_sup=dict_in['ls_S_hat_sup']
         #perform the updats
         ls_S_hat_n=G*[w_n_hat.energy() for w_n_hat in ls_w_hat_n] #eq 11
-        ls_S_hat_n=[ls_S_hat_sup[j]*(ls_S_hat_n[j]+epsilon**2).invert() 
+        # ls_S_hat_n=[ls_S_hat_sup[j]*(ls_S_hat_n[j]+epsilon**2).invert() 
+        #             for j in xrange(len(ls_S_hat_n))] #eq 11
+        ls_S_hat_n=[ls_S_hat_sup[j].flatten()*(1.0/(ls_S_hat_n[j]+epsilon**2))
                     for j in xrange(len(ls_S_hat_n))] #eq 11
         S_hat_n_csr=su.flatten_list_to_csr(ls_S_hat_n)
         ls_w_hat_n=(~A)*(w_n*(tau**2)) #eq 21
-        # pdb.set_trace()
         w_n_hat_flat=su.flatten_list(ls_w_hat_n)
         w_n_hat_flat=su.inv_block_diag(tausq_AtA + (nu**2)*S_hat_n_csr,dict_in)*w_n_hat_flat #eq 21 contd
         ls_w_hat_n_unflat=su.unflatten_list(w_n_hat_flat,A.duplicates)
@@ -407,6 +415,11 @@ class MSIST(Solver):
         #the +0 in the next line returns a new WS object...
         ls_w_hat_n=[ws_dummy.unflatten(w_hat_n_unflat)+0 for w_hat_n_unflat in ls_w_hat_n_unflat]
         w_bar_n=A*ls_w_hat_n #eq 13
+        w_bar_n=ws_dummy.unflatten(w_bar_n)+0 #eq 13 contd
+        #experimental stuff
+        # w_bar_sup=w_bar_n.nonzero()
+        # w_bar_n = w_bar_n*w_bar_sup+w_n*((w_bar_sup+(-1))*(-1))
+        # w_bar_n = W*((~W)*w_bar_n)
         #store back in the dict_in
         dict_in['ls_S_hat_n']=ls_S_hat_n
         dict_in['ls_w_hat_n']=ls_w_hat_n
