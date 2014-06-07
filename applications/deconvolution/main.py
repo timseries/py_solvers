@@ -9,6 +9,8 @@ from py_utils.section_factory import SectionFactory as sf
 
 from matplotlib import pyplot as plt
 
+import pdb
+
 def main():
     #configuration specification, absolute path
     # ps_path='/home/tim/repos/py_solvers/applications/deconvolution/uniform_40db_bsnr_cameraman.ini'
