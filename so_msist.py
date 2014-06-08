@@ -138,7 +138,7 @@ class MSIST(Solver):
                 cPickle.dump(dict_in['dict_bdiag'],filehandler)
                 del S_hat_n_csr
             else:    
-                filehandler=open(Shatbar_p_filename, 'r')
+                filehandler=open(Shatbar_p_filename, 'rb')
                 dict_in['dict_bdiag']=cPickle.load(filehandler)
             filehandler.close()    
             #store all of the l0rl2_group specific variables in the solver dict_in
