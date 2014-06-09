@@ -166,6 +166,8 @@ class MSIST(Solver):
             p_b_0 = self.get_val('p_b_0',True)
             p_k = self.get_val('p_k',True)
             p_theta = self.get_val('p_theta',True)
+            p_c = self.get_val('p_c',True)
+            p_d = self.get_val('p_d',True)
             b_n = WS(np.zeros(w_n.ary_lowpass.shape),
                      (w_n.one_subband(0)).tup_coeffs)
             if self.str_sparse_pen == 'vbmm_hmt':
