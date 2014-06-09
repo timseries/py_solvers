@@ -1,9 +1,6 @@
 *.py[cod]
 *.py.*
 *.sh.*
-*.jpg
-*.tif
-*.png
 *.log
 
 # C extensions
