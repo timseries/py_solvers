@@ -4,7 +4,6 @@ from numpy import arange, conj, sqrt,median, abs as nabs, exp, maximum as nmax
 from numpy.fft import fftn, ifftn
 from numpy.linalg import norm
 from scipy.sparse import csr_matrix
-from scipy.sparse.linalg import inv
 
 from py_utils.signal_utilities.ws import WS
 import py_utils.signal_utilities.sig_utils as su
@@ -32,12 +31,10 @@ class MSIST(Solver):
         super(MSIST,self).__init__(ps_params,str_section)
         self.str_sparse_pen = self.get_val('sparsepenalty',False)
         self.alpha = None
-        self.H = OperatorComp(ps_params,
-                              self.get_val('modalities',False))
+        self.H = OperatorComp(ps_params,self.get_val('modalities',False))
         if len(self.H.ls_ops)==1: #avoid slow 'eval' in OperatorComp
             self.H = self.H.ls_ops[0] 
-        self.W = OperatorComp(ps_params,
-                              self.get_val('transforms',False))
+        self.W = OperatorComp(ps_params,self.get_val('transforms',False))
         if len(self.W.ls_ops)==1: #avoid slow 'eval' in OperatorComp
             self.W = self.W.ls_ops[0] 
         self.alpha = self.get_val('alpha',True)
@@ -105,9 +102,9 @@ class MSIST(Solver):
             #create the structure for the duplicate variables
             #note, this is somewhat redundant...not all variables are copied
             #the same number of times
-            ls_w_hat_n = [w_n*0 for int_dup in xrange(A.duplicates)]
-            ls_S_hat_n = [w_n*0 for int_dup in xrange(A.duplicates)]
-            w_bar_n = w_n*0
+            ls_S_hat_n=[(w_n.energy()+epsilon[0]**2).invert() for int_dup in xrange(A.duplicates)]
+            ls_w_hat_n=[w_n*1 for j in xrange(A.duplicates)]
+            w_bar_n=w_n*1
             #now using the structure of A, initialize w_n_hat by
             #copying the elements of w_n in the correct places
             #precompute tau^2*AtA
@@ -117,7 +114,6 @@ class MSIST(Solver):
             # ls_w_hat_n=su.unflatten_list(D.transpose()*w_n.flatten(),A.duplicates)
             # ls_w_hat_n=[WS(np.zeros(w_n.ary_lowpass.shape),(w_n.one_subband(0)).tup_coeffs).unflatten(w_n_hat)
             #             for w_n_hat in ls_w_hat_n]
-            ls_w_hat_n=[WS(w_n.ary_lowpass,w_n.tup_coeffs) for j in xrange(A.duplicates)]
             ls_S_hat_sup=su.unflatten_list(D.transpose()*((w_n*0+1).flatten()),A.duplicates)
             ls_S_hat_sup=[(w_n*0).unflatten(S_hat_n_sup) for S_hat_n_sup in ls_S_hat_sup]
             ls_S_hat_sup=[S_hat_n_sup.nonzero() for S_hat_n_sup in ls_S_hat_sup]
@@ -146,6 +142,7 @@ class MSIST(Solver):
             dict_in['tausq_AtA']=tausq_AtA
             dict_in['ls_S_hat_sup']=ls_S_hat_sup
             self.update_duplicates(dict_in,nu[0],epsilon[0],tau)    
+            # pdb.set_trace()
             w_bar_n=dict_in['w_bar_n'] 
             ls_w_hat_n=dict_in['ls_w_hat_n']
             ls_S_hat_n=dict_in['ls_S_hat_n']
@@ -341,9 +338,8 @@ class MSIST(Solver):
             w_n = W * x_n
             #reprojection for the duplicated variables of l0rl2_group variant
             if self.str_sparse_pen == 'l0rl2_group':
-                if n==0:
-                    w_0=W*dict_in['x_0']
-                ls_w_hat_n = [ls_w_hat_n[j]*ls_S_hat_sup[j]+w_n*((ls_S_hat_sup[j]+(-1))*(-1)) for j in xrange(len(ls_w_hat_n))]
+                ls_w_hat_n = [ls_w_hat_n[j]*ls_S_hat_sup[j]+w_n*((ls_S_hat_sup[j]+(-1))*(-1))
+                              for j in xrange(len(ls_w_hat_n))]
                 ls_w_hat_n = [W*((~W)*w_hat_n) for w_hat_n in ls_w_hat_n]
                 w_bar_n = W*((~W)*w_bar_n)
                 dict_in['w_bar_n']=w_bar_n
@@ -404,7 +400,6 @@ class MSIST(Solver):
         S_hat_n_csr=su.flatten_list_to_csr(ls_S_hat_n)
         ls_w_hat_n=(~A)*(w_n*(tau**2)) #eq 21
         w_n_hat_flat=su.flatten_list(ls_w_hat_n)
-        # pdb.set_trace()
         w_n_hat_flat=su.inv_block_diag(tausq_AtA + (nu**2)*S_hat_n_csr,dict_in)*w_n_hat_flat #eq 21 contd
         ls_w_hat_n_unflat=su.unflatten_list(w_n_hat_flat,A.duplicates)
         ws_dummy=WS(np.zeros(w_n.ary_lowpass.shape),(w_n.one_subband(0)).tup_coeffs)

@@ -16,7 +16,7 @@ def main():
     for ix_,prompt in enumerate(ls_prompts):
         print 'Select ' + prompt + '...\n'
         str_path+=prompt+'/'
-        ls_options = os.listdir(str_path)
+        ls_options = list(set(os.listdir(str_path)).difference(set(['data'])))
         for index, option in enumerate(ls_options):
             print str(index) + ': ' + option
         int_sel=convertStr(raw_input('Select number, q to quit: '))
