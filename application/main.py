@@ -10,15 +10,15 @@ from py_utils.section_factory import SectionFactory as sf
 
 from matplotlib import pyplot as plt
 
-def main(ps_path==None):
+def main():
     #configuration specification, absolute path
-    if ps_path==None:
-        # ps_path='/home/tim/repos/py_solvers/applications/deconvolution/uniform_40db_bsnr_cameraman_msistg.ini'
+    if len(sys.argv)>1:
+        ps_path=sys.argv[1]
+    else:    
         ps_path='/home/tim/repos/py_solvers/applications/deconvolution/config/downsampled_cameraman_vbmm.ini'
     ps_params = ParameterStruct(ps_path)
     dict_in = {}
     sec_input = sf.create_section(ps_params,'Input1')
-    #sec_preprocess = sf.create_section(ps_params,'Preprocess1') implement  later
     sec_observe = sf.create_section(ps_params,'Observe1')
     so_solver = sf.create_section(ps_params,'Solver1')
 

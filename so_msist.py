@@ -105,13 +105,9 @@ class MSIST(Solver):
             #create the structure for the duplicate variables
             #note, this is somewhat redundant...not all variables are copied
             #the same number of times
-            ls_w_hat_n = [WS(np.zeros(w_n.ary_lowpass.shape),
-                             (w_n.one_subband(0)).tup_coeffs)
-                             for int_dup in xrange(A.duplicates)]
-            ls_S_hat_n = [WS(np.zeros(w_n.ary_lowpass.shape),
-                             (w_n.one_subband(0)).tup_coeffs)
-                             for int_dup in xrange(A.duplicates)]
-            w_bar_n = WS(np.zeros(w_n.ary_lowpass.shape),(w_n.one_subband(0)).tup_coeffs)
+            ls_w_hat_n = [w_n*0 for int_dup in xrange(A.duplicates)]
+            ls_S_hat_n = [w_n*0 for int_dup in xrange(A.duplicates)]
+            w_bar_n = w_n*0
             #now using the structure of A, initialize w_n_hat by
             #copying the elements of w_n in the correct places
             #precompute tau^2*AtA
@@ -122,13 +118,12 @@ class MSIST(Solver):
             # ls_w_hat_n=[WS(np.zeros(w_n.ary_lowpass.shape),(w_n.one_subband(0)).tup_coeffs).unflatten(w_n_hat)
             #             for w_n_hat in ls_w_hat_n]
             ls_w_hat_n=[WS(w_n.ary_lowpass,w_n.tup_coeffs) for j in xrange(A.duplicates)]
-            ls_S_hat_sup=su.unflatten_list(D.transpose()*(WS(np.zeros(w_n.ary_lowpass.shape),(w_n.one_subband(0)).tup_coeffs)+1).flatten(),A.duplicates)
-            ls_S_hat_sup=[WS(np.zeros(w_n.ary_lowpass.shape),(w_n.one_subband(0)).tup_coeffs).unflatten(S_hat_n_sup)
-                            for S_hat_n_sup in ls_S_hat_sup]
+            ls_S_hat_sup=su.unflatten_list(D.transpose()*((w_n*0+1).flatten()),A.duplicates)
+            ls_S_hat_sup=[(w_n*0).unflatten(S_hat_n_sup) for S_hat_n_sup in ls_S_hat_sup]
             ls_S_hat_sup=[S_hat_n_sup.nonzero() for S_hat_n_sup in ls_S_hat_sup]
             tausq_AtA = (tau**2)*(A.csr_avg.transpose()*A.csr_avg).tocsr()
             #initialize S_hat_bar parameters for efficient matrix inverses
-            Shatbar_p_filename=A.file_path.split('.')[0]+'Shatbar.pkl'
+            Shatbar_p_filename=A.file_path.split('.pkl')[0]+'Shatbar.pkl'
             if not os.path.isfile(Shatbar_p_filename):
                 dict_in['col_offset']=A.int_size
                 S_hat_n_csr=su.flatten_list_to_csr(ls_S_hat_sup)
@@ -154,7 +149,6 @@ class MSIST(Solver):
             w_bar_n=dict_in['w_bar_n'] 
             ls_w_hat_n=dict_in['ls_w_hat_n']
             ls_S_hat_n=dict_in['ls_S_hat_n']
-            # pdb.set_trace()
             del D #don't need this anymore, update rules only depend on A
             # del S_n #don't need this, since we are using S_hat_n
         #vbmm specific
@@ -345,7 +339,6 @@ class MSIST(Solver):
                 x_n=su.pad_center(x_n,dict_in['x_0'].shape)
             #reprojection (for all algorithms)
             w_n = W * x_n
-            # pdb.set_trace()
             #reprojection for the duplicated variables of l0rl2_group variant
             if self.str_sparse_pen == 'l0rl2_group':
                 if n==0:
@@ -411,6 +404,7 @@ class MSIST(Solver):
         S_hat_n_csr=su.flatten_list_to_csr(ls_S_hat_n)
         ls_w_hat_n=(~A)*(w_n*(tau**2)) #eq 21
         w_n_hat_flat=su.flatten_list(ls_w_hat_n)
+        # pdb.set_trace()
         w_n_hat_flat=su.inv_block_diag(tausq_AtA + (nu**2)*S_hat_n_csr,dict_in)*w_n_hat_flat #eq 21 contd
         ls_w_hat_n_unflat=su.unflatten_list(w_n_hat_flat,A.duplicates)
         ws_dummy=WS(np.zeros(w_n.ary_lowpass.shape),(w_n.one_subband(0)).tup_coeffs)
@@ -419,9 +413,6 @@ class MSIST(Solver):
         w_bar_n=A*ls_w_hat_n #eq 13
         w_bar_n=ws_dummy.unflatten(w_bar_n)+0 #eq 13 contd
         #experimental stuff
-        # w_bar_sup=w_bar_n.nonzero()
-        # w_bar_n = w_bar_n*w_bar_sup+w_n*((w_bar_sup+(-1))*(-1))
-        # w_bar_n = W*((~W)*w_bar_n)
         #store back in the dict_in
         dict_in['ls_S_hat_n']=ls_S_hat_n
         dict_in['ls_w_hat_n']=ls_w_hat_n
