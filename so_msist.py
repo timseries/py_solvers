@@ -27,7 +27,6 @@ class MSIST(Solver):
         """
         Class constructor for DTCWT
         """
-
         super(MSIST,self).__init__(ps_params,str_section)
         self.str_sparse_pen = self.get_val('sparsepenalty',False)
         self.alpha = None
@@ -142,12 +141,10 @@ class MSIST(Solver):
             dict_in['tausq_AtA']=tausq_AtA
             dict_in['ls_S_hat_sup']=ls_S_hat_sup
             self.update_duplicates(dict_in,nu[0],epsilon[0],tau)    
-            # pdb.set_trace()
             w_bar_n=dict_in['w_bar_n'] 
             ls_w_hat_n=dict_in['ls_w_hat_n']
             ls_S_hat_n=dict_in['ls_S_hat_n']
             del D #don't need this anymore, update rules only depend on A
-            # del S_n #don't need this, since we are using S_hat_n
         #vbmm specific
         if (self.str_sparse_pen == 'vbmm' or  #vbmm    
             self.str_sparse_pen == 'vbmm_hmt'):
@@ -393,8 +390,6 @@ class MSIST(Solver):
         ls_S_hat_sup=dict_in['ls_S_hat_sup']
         #perform the updats
         ls_S_hat_n=G*[w_n_hat.energy() for w_n_hat in ls_w_hat_n] #eq 11
-        # ls_S_hat_n=[ls_S_hat_sup[j]*(ls_S_hat_n[j]+epsilon**2).invert() 
-        #             for j in xrange(len(ls_S_hat_n))] #eq 11
         ls_S_hat_n=[ls_S_hat_sup[j].flatten()*(1.0/(ls_S_hat_n[j]+epsilon**2))
                     for j in xrange(len(ls_S_hat_n))] #eq 11
         S_hat_n_csr=su.flatten_list_to_csr(ls_S_hat_n)
