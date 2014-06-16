@@ -28,8 +28,7 @@ class Classify(Solver):
         Class constructor for Classify
         """
         super(Classify,self).__init__(ps_params,str_section)
-        self.S = OperatorComp(ps_params,
-                              self.get_val('transforms',False))
+        self.S = OperatorComp(ps_params,self.get_val('transforms',False))
         if len(self.S.ls_ops)==1: #avoid slow 'eval' in OperatorComp
             self.S = self.S.ls_ops[0]
         self.classifier_method = self.get_val('method',False)
