@@ -76,16 +76,18 @@ class Classify(Solver):
         """
         super(Classify,self).solve()
         S = self.S
-        feature_reduce = Scat().reduce #function handle 
-        classes = dict_in['x'].keys()
+        feature_reduce = Scat().reduce #function handle to static method
+        classes = sorted(dict_in['x'].keys())
+        dict_in['class_labels']=classes
         if self.feature_sec_in != '': #load the feature vectors from disk
             sec_input = sf.create_section(self.get_params(),self.feature_sec_in)
             dict_in['x_feature'] = sec_input.read(dict_in,return_val=True)
-            if self.class_sec_in != '': #the class specification (csv), should already have been read in
-                #now organize dict_in['x_feature'] into classes using dict_in['x']
-                #dict_in['x_feature']['exemplarid']->dict_in['x_feature']['exemplarclass'] 
+
+            if self.class_sec_in != '': 
+                #the class specification (csv), should already have been read in sec_input
+                #now organize dict_in['x_feature'] into classes using dict_in['x'] as a reference
+                #dict_in['x_feature'][exemplarid]->dict_in['x_feature'][exemplarclass] 
                 #where dict_in['x_feature']['exemplarclass'] is a list
-                #using pop to avoid copying data
                 print 'organizing classes for this experiment...'
                 for _class in classes:
                     dict_in['x_feature'][_class]=[]
@@ -99,11 +101,7 @@ class Classify(Solver):
                 print 'generating scattering features for class ' + _class
                 n_samples = len(dict_in['x'][_class])
                 dict_in['x_feature'][_class]=([feature_reduce((S*dict_in['x'][_class][sample][1]).flatten(),
-                                    method=self.feature_reduction) for 
-                                    sample in xrange(n_samples)])
-            #update and save
-            met_output_obj.update(dict_in)
-            self.results.save_metric(met_output_obj)
+                                                              method=self.feature_reduction) for sample in xrange(n_samples)])
 
         #assumes each feature vector is the same size for all exemplars...
         dict_in['feature_vector_size'] = dict_in['x_feature'][classes[0]][-1].size
@@ -112,7 +110,7 @@ class Classify(Solver):
         
         #vector to hold the training labels
         ytrain = np.zeros(dict_in['n_training_samples'],dtype='int16')
-        ytest = np.zeros(dict_in['n_testing_samples'],dtype='int16')
+        ytest  = np.zeros(dict_in['n_testing_samples'],dtype='int16')
         sample_index = 0
         print 'generating training/test data using pre-computed partitions...'
         #generate the training and test data matrix (X) and label vectors (y)
@@ -164,9 +162,7 @@ class Classify(Solver):
             #error matrix is (D+1) X ()
             #where D is the number of components in the pca decomposition
             pcaD=self.clf.components_.shape[0]+1
-            error_matrix=np.zeros([pcaD,
-                                  dict_in['n_testing_samples'],
-                                  len(classes)])
+            error_matrix=np.zeros([pcaD,dict_in['n_testing_samples'],len(classes)])
             for _class_index,_class in enumerate(classes):      
                 sx_minus_esxc=Xtest-dict_in['pca_train'][_class][0]
                 vc=dict_in['pca_train'][_class][1]
