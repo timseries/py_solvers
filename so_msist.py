@@ -52,69 +52,54 @@ class MSIST(Solver):
         H = self.H
         W = self.W
         #input data 
-        y_hat = fftn(dict_in['y'])
-        x_n = dict_in['x_0'].copy() #initial solution
-        # x_n = dict_in['x'].copy() #initial solution, for debugging
-        dict_in['x_n'] = x_n
-        #group structure
-        if self.str_group_structure == 'self':
-            g_i = 1.0
-        elif self.str_group_structure == 'complexself':
-            g_i = 2.0
-        elif self.str_group_structure == 'parentchildren':
-            g_i = 2.0
-        elif self.str_group_structure == 'parentchild':
-            g_i = 2.0
-        elif self.str_group_structure == '':
-            g_i = 2.0
+        if not H.output_fourier:
+            y_hat = fftn(dict_in['y'])
         else:
-            raise Exception("no such group structure " + self.str_group_structure)
+            y_hat = dict_in['y'] #y is already in the Fourier domain (NMR/MRI)
+        x_n = dict_in['x_0'].copy() #initial solution
+        dict_in['x_n'] = x_n
         #input parameters and initialization
         if self.alpha.__class__.__name__ != 'ndarray':
             self.alpha = su.spectral_radius(self.W,self.H,dict_in['x_0'].shape,self.alpha_method)
         alpha = self.alpha    
-        w_n = W * x_n
+        if self.str_sparse_pen[-4:] == 'cplx':    
+            w_n = [W * x_n.real, W * x_n.imag]
+            g_i = 2 * (w_n[0].is_wavelet_complex() + 1)
+        else:
+            w_n = [W * x_n]
+            g_i = (w_n.is_wavelet_complex() + 1)
+            g_i_half = g_i/2 #used to normalize computation of S
+            w_n_it = xrange(g_i_half) #iterator for real vs real/complex w_n
         #initialize the precision matrix
-        S_n = WS(np.zeros(w_n.ary_lowpass.shape),(w_n.one_subband(0)).tup_coeffs) #initialize the variance matrix as a ws object
-        #every variant does these next steps
+        S_n = w_n*0 #initialize the variance matrix as a ws object
         dict_in['w_n'] = w_n
         epsilon,nu = self.get_epsilon_nu()
         dict_in['nu_sq'] = nu**2
         dict_in['epsilon_sq'] = epsilon**2
-        #l0rl2_bivar specific
         if self.str_sparse_pen == 'l0rl2_bivar':    
-            #the thresholds which is saved 
-            w_tilde = WS(np.zeros(w_n.ary_lowpass.shape),
-                         (w_n.one_subband(0)).tup_coeffs)
+            w_tilde = w_n[0]*0
             sqrt3=sqrt(3.0)
-        #l0rl2_group specific
-        if self.str_sparse_pen == 'l0rl2_group':
-            #initialize the cluster averaging matrix, A
+        if self.str_sparse_pen[:11] == 'l0rl2_group':
             tau = self.get_val('tau',True)
             #the non-overlapping space is just a list of ws objects
             #copy the initial ws object here
             A = sf.create_section(self.ps_parameters,self.get_val('clusteraverage',False))
             G = sf.create_section(self.ps_parameters,self.get_val('groupaverage',False))
             #initialize A and G by doing dummy multiplies (initialized with parameters of the master vector)
-            A.init_csr_avg(w_n)
-            G.init_csr_avg(w_n)
-            #create the structure for the duplicate variables
-            #note, this is somewhat redundant...not all variables are copied
-            #the same number of times
-            ls_S_hat_n=[(w_n.energy()+epsilon[0]**2).invert() for int_dup in xrange(A.duplicates)]
-            ls_w_hat_n=[w_n*1 for j in xrange(A.duplicates)]
-            w_bar_n=w_n*1
+            A.init_csr_avg(w_n[0])
+            G.init_csr_avg(w_n[0])
+            ls_S_hat_n = [(1/g_i_half*sum([w_n[ix_].energy() for ix_ in w_in_it])+epsilon[0]**2).invert()
+                          for int_dup in xrange(A.duplicates)]
+            ls_w_hat_n = [[w_n[ix_]*1 for j in xrange(A.duplicates)] for ix_ in w_in_it]
+            w_bar_n = [w_n[ix_]*1 for ix_ in w_in_it]
             #now using the structure of A, initialize w_n_hat by
             #copying the elements of w_n in the correct places
             #precompute tau^2*AtA
             A_row_indices=np.nonzero(A.csr_avg)[0]
             A_col_indices=np.nonzero(A.csr_avg)[1]
             D=csr_matrix((np.ones(A_col_indices.size,),(A_row_indices,A_col_indices)),shape=A.csr_avg.shape)
-            # ls_w_hat_n=su.unflatten_list(D.transpose()*w_n.flatten(),A.duplicates)
-            # ls_w_hat_n=[WS(np.zeros(w_n.ary_lowpass.shape),(w_n.one_subband(0)).tup_coeffs).unflatten(w_n_hat)
-            #             for w_n_hat in ls_w_hat_n]
-            ls_S_hat_sup=su.unflatten_list(D.transpose()*((w_n*0+1).flatten()),A.duplicates)
-            ls_S_hat_sup=[(w_n*0).unflatten(S_hat_n_sup) for S_hat_n_sup in ls_S_hat_sup]
+            ls_S_hat_sup=su.unflatten_list(D.transpose()*((w_n[0]*0+1).flatten()),A.duplicates)
+            ls_S_hat_sup=[(w_n[0]*0).unflatten(S_hat_n_sup) for S_hat_n_sup in ls_S_hat_sup]
             ls_S_hat_sup=[S_hat_n_sup.nonzero() for S_hat_n_sup in ls_S_hat_sup]
             tausq_AtA = (tau**2)*(A.csr_avg.transpose()*A.csr_avg).tocsr()
             #initialize S_hat_bar parameters for efficient matrix inverses
@@ -140,6 +125,8 @@ class MSIST(Solver):
             dict_in['W']=W
             dict_in['tausq_AtA']=tausq_AtA
             dict_in['ls_S_hat_sup']=ls_S_hat_sup
+            dict_in['w_n_it']=w_n_it
+            dict_in['ws_dummy']=w_n*0
             self.update_duplicates(dict_in,nu[0],epsilon[0],tau)    
             w_bar_n=dict_in['w_bar_n'] 
             ls_w_hat_n=dict_in['ls_w_hat_n']
@@ -148,19 +135,16 @@ class MSIST(Solver):
         #vbmm specific
         if (self.str_sparse_pen == 'vbmm' or  #vbmm    
             self.str_sparse_pen == 'vbmm_hmt'):
-            b_n = WS(np.zeros(w_n.ary_lowpass.shape),
-                     (w_n.one_subband(0)).tup_coeffs)
             p_a = self.get_val('p_a',True)
             p_b_0 = self.get_val('p_b_0',True)
             p_k = self.get_val('p_k',True)
             p_theta = self.get_val('p_theta',True)
             p_c = self.get_val('p_c',True)
             p_d = self.get_val('p_d',True)
-            b_n = WS(np.zeros(w_n.ary_lowpass.shape),
-                     (w_n.one_subband(0)).tup_coeffs)
+            b_n = w_n[0]*0
             if self.str_sparse_pen == 'vbmm_hmt':
                 ary_a = self.get_gamma_shapes(W * dict_in['x_0'])
-            for s in arange(w_n.int_subbands):
+            for s in arange(w_n[0].int_subbands):
                 b_n.set_subband(s, p_b_0)
             adj_factor = 1.3
     
@@ -168,7 +152,10 @@ class MSIST(Solver):
         if (self.str_sparse_pen[0:7] == 'poisson'):
             #need a 0-padded y to get the right size for the scaling coefficients
             b = dict_in['b']
-            y_hat = fftn(dict_in['y'] - b) #need a different yhat for the iterations...
+            if not H.outputfourier:
+                y_hat = fftn(dict_in['y'] - b) #need a different yhat for the iterations...
+            else:
+                y_hat = fftn(ifftn(dict_in['y']) - b)
             w_y = (W*dict_in['y_padded'])
             dict_in['x_n']=su.crop_center(x_n,dict_in['y'].shape)
             w_y_scaling_coeffs=w_y.downsample_scaling()
@@ -178,14 +165,20 @@ class MSIST(Solver):
         #begin iterations here for the MSIST(-X) algorithm
         for n in np.arange(self.int_iterations):
             #doing fourier domain operation explicitly here, this save some transforms in the next step
-            H.set_output_fourier(True)
+            H.set_output_fourier(True) #force Fourier output to reduce number of ffts
             #Landweber difference
-            f_resid = ifftn(y_hat - H * x_n)
+            if self.str_sparse_pen[-4:] == 'cplx': 
+                f_resid = y_hat - H * x_n
+            else:    
+                f_resid = ifftn(y_hat - H * x_n)
             if (self.str_sparse_pen == 'poisson_deblur_sp'):#spatial domain thresholding goes here
                 f_resid/=(dict_in['y']+nu[n]**2)
             H.set_output_fourier(False)
-            #Landweber projection back to spatial domain
-            w_resid = W * (~H * f_resid)
+            #Landweber projection back to observation domain
+            if self.str_sparse_pen[-4:] == 'cplx': 
+                w_resid = [W * (~H * f_resid).real, W * (~H * f_resid).imag]
+            else:
+                w_resid = [W * (~H * f_resid)]
             #the bivariate shrinkage penalty in l0rl2 (coefficient neighborhood averags)
             if self.str_sparse_pen == 'l0rl2_bivar' and n==0:
                 sigsq_n = self.get_val('nustop', True)**2
@@ -202,25 +195,25 @@ class MSIST(Solver):
                 w_bar_n=dict_in['w_bar_n'] 
                 ls_w_hat_n=dict_in['ls_w_hat_n']
             #subband-adaptive subband update    
-            for s in xrange(w_n.int_subbands-1,-1,-1):
+            for s in xrange(w_n[0].int_subbands-1,-1,-1):
                 #variance estimate depends on the version of msist 
                 #{l0rl2,l0rl2_bivar,l0rl2_group,vbmm,vbmm_hmt,poisson_deblur}
                 #this gives different sparse penalties
                 if self.str_sparse_pen == 'l0rl2': #basic msist algorithm
-                    S_n.set_subband(s,(1.0 / ((1.0 / g_i) * nabs(w_n.get_subband(s))**2 + epsilon[n]**2)))
+                    S_n.set_subband(s,(1.0 / ((1.0 / g_i) * nabs(w_n[0].get_subband(s))**2 + epsilon[n]**2)))
                 elif self.str_sparse_pen[:7] == 'poisson':
                     if 1: #self.str_sparse_pen == 'poisson_deblur': #msist with poisson-corrupted noise, 
                         if s==0:
                             ary_p_var = w_y.ary_lowpass
                         else:
-                            int_level, int_orientation = w_n.lev_ori_from_subband(s)
+                            int_level, int_orientation = w_n[0].lev_ori_from_subband(s)
                             ary_p_var = w_y_scaling_coeffs[int_level]
                         ary_p_var[ary_p_var<=0]=.01
-                    S_n.set_subband(s,(1.0 / ((1.0 / g_i) * nabs(w_n.get_subband(s))**2 + epsilon[n]**2)))
+                    S_n.set_subband(s,(1.0 / ((1.0 / g_i) * nabs(w_n[0].get_subband(s))**2 + epsilon[n]**2)))
                 elif self.str_sparse_pen == 'l0rl2_bivar':
                     if s > 0:    
-                        s_parent_us = nabs(w_n.get_upsampled_parent(s))**2
-                        s_child = nabs(w_n.get_subband(s))**2
+                        s_parent_us = nabs(w_n[0].get_upsampled_parent(s))**2
+                        s_child = nabs(w_n[0].get_subband(s))**2
                         yi,yi_mask = su.get_neighborhoods(s_child,1) #eq 8, Sendur BSWLVE paper, yzhang code doesn't do this...
                         s_child_norm = sqrt(s_parent_us + s_child)
                         sigsq_y = np.sum(yi,axis=yi.ndim-1)/np.sum(yi_mask,axis=yi.ndim-1)#still eq 8...
@@ -230,23 +223,23 @@ class MSIST(Solver):
                         if np.mod(n,2)==0:    #update with the bivariate thresholded coefficients on every other iteration
                             S_n.set_subband(s,(1.0 / 
                                                ((1.0 / g_i) *  
-                                                nabs(thresh * w_n.get_subband(s))**2 + (epsilon[n]**2))))
+                                                nabs(thresh * w_n[0].get_subband(s))**2 + (epsilon[n]**2))))
                         else:
                             S_n.set_subband(s,(1.0 / 
                                                ((1.0 / g_i) * 
-                                                nabs(w_n.get_subband(s))**2 + (epsilon[n]**2))))
+                                                nabs(w_n[0].get_subband(s))**2 + (epsilon[n]**2))))
                     else:
-                        S_n.set_subband(s,(1.0 / ((1.0 / g_i) * nabs(w_n.get_subband(s))**2 + epsilon[n]**2)))
+                        S_n.set_subband(s,(1.0 / ((1.0 / g_i) * nabs(w_n[0].get_subband(s))**2 + epsilon[n]**2)))
                 elif self.str_sparse_pen == 'l0rl2_group': #msist-g, Shat is updated before this loop
                     if s==0:
-                        S_n.set_subband(s,(1.0 / ((1.0 / g_i) * nabs(w_n.get_subband(s))**2 + epsilon[n]**2)))
+                        S_n.set_subband(s,(1.0 / ((1.0 / g_i) * nabs(w_n[0].get_subband(s))**2 + epsilon[n]**2)))
                 elif self.str_sparse_pen == 'vbmm': #vbmm    
                     if n == 0:
                         sigma_n = 0
                     else:
                         sigma_n = (1.0 / nu[n]**2 * alpha[s] + S_n.get_subband(s))**(-1)
                     S_n.set_subband(s, (g_i + 2.0 * p_a) / 
-                                    (nabs(w_n.get_subband(s))**2 + sigma_n + 2.0 * b_n.get_subband(s)))
+                                    (nabs(w_n[0].get_subband(s))**2 + sigma_n + 2.0 * b_n.get_subband(s)))
                     b_n.set_subband(s, (p_k + p_a) / 
                                     (S_n.get_subband(s) + p_theta))
                 elif self.str_sparse_pen == 'vbmm_hmt': #vbmm    
@@ -256,7 +249,7 @@ class MSIST(Solver):
                         sigma_n = (1.0 / nu[n]**2 * alpha[s] + S_n.get_subband(s))**(-1)
                     # if s < w_n.int_subbands - w_n.int_orientations and s > 0:    
                     if s > 0:    
-                        w_parent_us = w_n.get_upsampled_parent(s)
+                        w_parent_us = w_n[0].get_upsampled_parent(s)
                         alpha_dec = 2.25
                         if s > S_n.int_orientations:
                             s_child = S_n.subband_group_sum(s-S_n.int_orientations,'children')
@@ -268,13 +261,13 @@ class MSIST(Solver):
                             ap = ary_a[s+S_n.int_orientations]
                         else:
                             ap = .5
-                        w_en_avg = w_n.subband_group_sum(s,'parent_children')
+                        w_en_avg = w_n[0].subband_group_sum(s,'parent_children')
                         # S_n.set_subband(s, (g_i + 2.0 *  ary_a[s]) / 
                         #                 (nabs(w_n.get_subband(s))**2 + sigma_n + 
                         #                  2.0 * b_n.get_subband(s)))
                         #the standard vbmm b with estimated shape parameter,works with the parent+4 children b
                         S_n.set_subband(s, (g_i + 2.0 *  ary_a[s]) / 
-                                        (nabs(w_n.get_subband(s))**2 + sigma_n + 
+                                        (nabs(w_n[0].get_subband(s))**2 + sigma_n + 
                                          2.0 * b_n.get_subband(s)))
                         #the vbmm hmt model for s,b, ngk
                         # S_n.set_subband(s, (g_i + 2.0 * ap + ary_a[s]) / 
@@ -290,7 +283,7 @@ class MSIST(Solver):
                         # b_n.set_subband(s,ary_a[s] *  (2**(-alpha_dec)) * (np.abs(w_parent_us)**2))
                     else: #no parents, so generate fixed-param gammas
                         S_n.set_subband(s, (g_i + 2.0 * ary_a[s]) / 
-                                        (nabs(w_n.get_subband(s))**2 + sigma_n +
+                                        (nabs(w_n[0].get_subband(s))**2 + sigma_n +
                                          2.0 * b_n.get_subband(s)))
                         b_n.set_subband(s, (p_k + ary_a[s]) / 
                                         (S_n.get_subband(s) + p_theta))
@@ -298,28 +291,40 @@ class MSIST(Solver):
                     raise ValueError('no such solver variant')
                 #update current solution
                 if (self.str_sparse_pen == 'poisson_deblur_sp'):#spatial domain thresholding goes here
-                    w_n.set_subband(s, \
-                      (alpha[s] * w_n.get_subband(s) + w_resid.get_subband(s)) / \
+                    w_n[0].set_subband(s, \
+                      (alpha[s] * w_n[0].get_subband(s) + w_resid[0].get_subband(s)) / \
                       (alpha[s] + S_n.get_subband(s)))
                 elif (self.str_sparse_pen == 'poisson_deblur'):
-                    w_n.set_subband(s, \
-                      (alpha[s] * w_n.get_subband(s) + w_resid.get_subband(s)) / \
+                    w_n[0].set_subband(s, \
+                      (alpha[s] * w_n[0].get_subband(s) + w_resid[0].get_subband(s)) / \
                       (alpha[s] + (nu[n]**2+ary_p_var) * S_n.get_subband(s)))
-                elif (self.str_sparse_pen == 'l0rl2_group'):
+                elif (self.str_sparse_pen[[:11]] == 'l0rl2_group'):
                     if s>0:
-                        w_n.set_subband(s,
-                                        (alpha[s] * w_n.get_subband(s) + w_resid.get_subband(s) + 
-                                         (tau**2)*w_bar_n.get_subband(s)) / (alpha[s] + tau**2))
+                        for ix_ in w_n_it:
+                            w_n[ix_].set_subband(s,
+                                            (alpha[s] * w_n[ix_].get_subband(s) + w_resid[ix_].get_subband(s) + 
+                                             (tau**2)*w_bar_n[ix_].get_subband(s)) / (alpha[s] + tau**2))
                     else: #a standard msist update for the lowpass coeffs
-                        w_n.set_subband(s, \
-                                        (alpha[s] * w_n.get_subband(s) + w_resid.get_subband(s)) / \
-                                        (alpha[s] + (nu[n]**2) * S_n.get_subband(s)))
+                        for ix_ in w_n_it:
+                            w_n[ix_].set_subband(s, \
+                                            (alpha[s] * w_n[ix_].get_subband(s) + w_resid[ix_].get_subband(s)) / 
+                                            (alpha[s] + (nu[n]**2) * S_n.get_subband(s)))
                 else: 
-                    w_n.set_subband(s, \
-                      (alpha[s] * w_n.get_subband(s) + w_resid.get_subband(s)) / \
-                      (alpha[s] + (nu[n]**2) * S_n.get_subband(s)))
+                    w_n[0].set_subband(s, 
+                                    (alpha[s] * w_n[0].get_subband(s) + w_resid[0].get_subband(s)) / 
+                                    (alpha[s] + (nu[n]**2) * S_n.get_subband(s)))
                 #end updating subbands   
-            x_n = ~W * w_n
+            #project back to spatial domain for any spatial domain operations    
+            if self.str_sparse_pen[-4:] == 'cplx':    
+                x_n = (~W * w_n[0]) + 1j*(~W * w_n[0])
+                if self.phase_encoded: #need to apply boundary conditions for phase encoded velocity 
+                    m_n = abs(x_n)
+                    theta_n =su.phase_unwrap(angle(x_n),dict_in['dict_global_lims'],dict_in['ls_vcorrect_secs'])
+                    if self.get_value('iterationmask'): #need to apply boundary conditions for phase encoded velocity 
+                        theta_n *= dict_in['mask']
+                    x_n = m_n*exp(1j*theta_n)
+            else:    
+                x_n = ~W * w_n[0]
             #need to unpad x_n now for computing metrics
             if self.str_sparse_pen=='poisson_deblur':
                 #need to remove the invalid border of this iterate
@@ -332,15 +337,18 @@ class MSIST(Solver):
             if self.str_sparse_pen=='poisson_deblur':
                 x_n=su.pad_center(x_n,dict_in['x_0'].shape)
             #reprojection (for all algorithms)
-            w_n = W * x_n
+            if self.str_sparse_pen[-4:] == 'cplx':    
+                w_n = [W * x_n.real, W * x_n.imag]
+            else:
+                w_n = [W * x_n]
             #reprojection for the duplicated variables of l0rl2_group variant
-            if self.str_sparse_pen == 'l0rl2_group':
-                ls_w_hat_n = [ls_w_hat_n[j]*ls_S_hat_sup[j]+w_n*((ls_S_hat_sup[j]+(-1))*(-1))
-                              for j in xrange(len(ls_w_hat_n))]
-                ls_w_hat_n = [W*((~W)*w_hat_n) for w_hat_n in ls_w_hat_n]
-                w_bar_n = W*((~W)*w_bar_n)
-                dict_in['w_bar_n']=w_bar_n
-                dict_in['ls_w_hat_n']=ls_w_hat_n
+            if self.str_sparse_pen[:11] == 'l0rl2_group':
+                ls_w_hat_n = [[ls_w_hat_n[ix_][j]*ls_S_hat_sup[j]+w_n[ix_]*((ls_S_hat_sup[j]+(-1))*(-1))
+                              for j in xrange(len(ls_S_hat_sup))] for ix_ in w_n_it]
+                ls_w_hat_n = [[W*((~W)*w_hat_n) for w_hat_n in ls_w_hat_n[ix_]] for ix_ in w_n_it]
+                w_bar_n = [W*((~W)*w_bar_n[ix_]) for ix_ in w_in_it]
+                dict_in['w_bar_n'] = w_bar_n
+                dict_in['ls_w_hat_n'] = ls_w_hat_n
             dict_in['w_n'] = w_n
             #update results
             self.results.update(dict_in)
@@ -374,10 +382,10 @@ class MSIST(Solver):
             raise Exception('no such continuation parameter rule')
         return epsilon,nu
 
-    def update_duplicates(self, dict_in,nu,epsilon,tau):
+    def update_duplicates(self, dict_in, nu, epsilon, tau):
         '''update the duplicate estimates in (the msist-g algorithm updates)
         '''
-        #these change
+        #these dict_in members change
         ls_S_hat_n=dict_in['ls_S_hat_n']
         ls_w_hat_n=dict_in['ls_w_hat_n']
         w_bar_n=dict_in['w_bar_n']
@@ -386,23 +394,25 @@ class MSIST(Solver):
         G=dict_in['G']
         A=dict_in['A']
         W=dict_in['W']
+        ws_dummy=dict_in['ws_dummy']
         tausq_AtA=dict_in['tausq_AtA']
         ls_S_hat_sup=dict_in['ls_S_hat_sup']
         #perform the updats
-        ls_S_hat_n=G*[w_n_hat.energy() for w_n_hat in ls_w_hat_n] #eq 11
+        ls_S_hat_n=G*[1/g_i_half*sum([ls_w_hat_n[ix_][ix2].energy() for ix_ in w_n_it])
+                      for ix2 in xrange(len(ls_w_hat_n))] #eq 11
         ls_S_hat_n=[ls_S_hat_sup[j].flatten()*(1.0/(ls_S_hat_n[j]+epsilon**2))
                     for j in xrange(len(ls_S_hat_n))] #eq 11
         S_hat_n_csr=su.flatten_list_to_csr(ls_S_hat_n)
-        ls_w_hat_n=(~A)*(w_n*(tau**2)) #eq 21
-        w_n_hat_flat=su.flatten_list(ls_w_hat_n)
-        w_n_hat_flat=su.inv_block_diag(tausq_AtA + (nu**2)*S_hat_n_csr,dict_in)*w_n_hat_flat #eq 21 contd
-        ls_w_hat_n_unflat=su.unflatten_list(w_n_hat_flat,A.duplicates)
-        ws_dummy=WS(np.zeros(w_n.ary_lowpass.shape),(w_n.one_subband(0)).tup_coeffs)
+        ls_w_hat_n=[(~A)*(w_n[ix_]*(tau**2)) for ix_ in w_n_it] #eq 21
+        w_n_hat_flat=[su.flatten_list(ls_w_hat_n[ix_]) for ix_ in w_n_it]
+        S_hat_bar_inv=su.inv_block_diag(tausq_AtA + (nu**2)*S_hat_n_csr,dict_in)
+        w_n_hat_flat=[S_hat_bar_inv*w_n_hat_flat[ix_] for ix_ in w_n_it] #eq21 ctd
+        ls_w_hat_n_unflat=[su.unflatten_list(w_n_hat_flat[ix_],A.duplicates) for ix_ in w_n_it]
         #the +0 in the next line returns a new WS object...
-        ls_w_hat_n=[ws_dummy.unflatten(w_hat_n_unflat)+0 for w_hat_n_unflat in ls_w_hat_n_unflat]
-        w_bar_n=A*ls_w_hat_n #eq 13
-        w_bar_n=ws_dummy.unflatten(w_bar_n)+0 #eq 13 contd
-        #experimental stuff
+        ls_w_hat_n=[[ws_dummy.unflatten(w_hat_n_unflat)+0 for w_hat_n_unflat in ls_w_hat_n_unflat[ix_]]
+                     for ix_ in w_n_it]
+        w_bar_n=[A*ls_w_hat_n[ix_] for ix_ in w_n_it]  #eq 13
+        w_bar_n=[ws_dummy.unflatten(w_bar_n[ix_])+0 for ix_ in w_n_it]#eq 13 contd
         #store back in the dict_in
         dict_in['ls_S_hat_n']=ls_S_hat_n
         dict_in['ls_w_hat_n']=ls_w_hat_n
