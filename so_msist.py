@@ -1,6 +1,6 @@
 #!/usr/bin/python -tt
 import numpy as np
-from numpy import arange, conj, sqrt,median, abs as nabs, exp, maximum as nmax
+from numpy import arange, conj, sqrt,median, abs as nabs, exp, maximum as nmax, angle
 from numpy.fft import fftn, ifftn
 from numpy.linalg import norm
 from scipy.sparse import csr_matrix
@@ -42,6 +42,7 @@ class MSIST(Solver):
         if self.alpha_method=='':
             self.alpha_method = 'spectrum'
         self.str_group_structure = self.get_val('grouptypes',False)
+        self.phase_encoded = self.get_val('phaseencoded',)
         
     def solve(self,dict_in):
         """
@@ -58,6 +59,9 @@ class MSIST(Solver):
             y_hat = dict_in['y'] #y is already in the Fourier domain (NMR/MRI)
         x_n = dict_in['x_0'].copy() #initial solution
         dict_in['x_n'] = x_n
+        if self.str_sparse_pen[-4:] == 'cplx':    
+            dict_in['theta_n'] = angle(x_n)
+            dict_in['magnitude_n'] = nabs(x_n)
         #input parameters and initialization
         if self.alpha.__class__.__name__ != 'ndarray':
             self.alpha = su.spectral_radius(self.W,self.H,dict_in['x_0'].shape,self.alpha_method)
@@ -67,11 +71,11 @@ class MSIST(Solver):
             g_i = 2 * (w_n[0].is_wavelet_complex() + 1)
         else:
             w_n = [W * x_n]
-            g_i = (w_n.is_wavelet_complex() + 1)
-            g_i_half = g_i/2 #used to normalize computation of S
-            w_n_it = xrange(g_i_half) #iterator for real vs real/complex w_n
+            g_i = (w_n[0].is_wavelet_complex() + 1)
+        g_i_half = g_i/2 #used to normalize computation of S
+        w_n_it = xrange(g_i_half) #iterator for w_n list (real vs real/complex w_n)
         #initialize the precision matrix
-        S_n = w_n*0 #initialize the variance matrix as a ws object
+        S_n = w_n[0]*0 #initialize the variance matrix as a ws object
         dict_in['w_n'] = w_n
         epsilon,nu = self.get_epsilon_nu()
         dict_in['nu_sq'] = nu**2
@@ -88,10 +92,11 @@ class MSIST(Solver):
             #initialize A and G by doing dummy multiplies (initialized with parameters of the master vector)
             A.init_csr_avg(w_n[0])
             G.init_csr_avg(w_n[0])
-            ls_S_hat_n = [(1/g_i_half*sum([w_n[ix_].energy() for ix_ in w_in_it])+epsilon[0]**2).invert()
-                          for int_dup in xrange(A.duplicates)]
-            ls_w_hat_n = [[w_n[ix_]*1 for j in xrange(A.duplicates)] for ix_ in w_in_it]
-            w_bar_n = [w_n[ix_]*1 for ix_ in w_in_it]
+            dup_it = xrange(A.duplicates) # iterator for duplicate variable space
+            ls_S_hat_n = [((sum([w_n[ix_].energy() for ix_ in w_n_it]) / g_i_half) + epsilon[0]**2).invert()
+                          for int_dup in dup_it]
+            ls_w_hat_n = [[w_n[ix_]*1 for j in dup_it] for ix_ in w_n_it]
+            w_bar_n = [w_n[ix_]*1 for ix_ in w_n_it]
             #now using the structure of A, initialize w_n_hat by
             #copying the elements of w_n in the correct places
             #precompute tau^2*AtA
@@ -126,8 +131,12 @@ class MSIST(Solver):
             dict_in['tausq_AtA']=tausq_AtA
             dict_in['ls_S_hat_sup']=ls_S_hat_sup
             dict_in['w_n_it']=w_n_it
-            dict_in['ws_dummy']=w_n*0
+            dict_in['dup_it']=dup_it
+            dict_in['ws_dummy']=w_n[0]*0
+            dict_in['g_i_half']=g_i_half
+            
             self.update_duplicates(dict_in,nu[0],epsilon[0],tau)    
+            
             w_bar_n=dict_in['w_bar_n'] 
             ls_w_hat_n=dict_in['ls_w_hat_n']
             ls_S_hat_n=dict_in['ls_S_hat_n']
@@ -191,104 +200,107 @@ class MSIST(Solver):
             ary_p_var=0 #this is zero for all variance, except the poisson deblurring
             if self.str_sparse_pen == 'l0rl2_group':
             #calculate S_hat_n, w_hat_n, and wb_bar (eqs 11, 19, and 13)
-                self.update_duplicates(dict_in,nu[n],epsilon[n],tau)    
+                self.update_duplicates(dict_in, nu[n], epsilon[n], tau)    
                 w_bar_n=dict_in['w_bar_n'] 
                 ls_w_hat_n=dict_in['ls_w_hat_n']
-            #subband-adaptive subband update    
-            for s in xrange(w_n[0].int_subbands-1,-1,-1):
-                #variance estimate depends on the version of msist 
-                #{l0rl2,l0rl2_bivar,l0rl2_group,vbmm,vbmm_hmt,poisson_deblur}
-                #this gives different sparse penalties
-                if self.str_sparse_pen == 'l0rl2': #basic msist algorithm
-                    S_n.set_subband(s,(1.0 / ((1.0 / g_i) * nabs(w_n[0].get_subband(s))**2 + epsilon[n]**2)))
-                elif self.str_sparse_pen[:7] == 'poisson':
-                    if 1: #self.str_sparse_pen == 'poisson_deblur': #msist with poisson-corrupted noise, 
+            #####################################################    
+            #subband-adaptive subband update of precision matrix#
+            #####################################################    
+            if self.str_sparse_pen == 'l0rl2' or self.str_sparse_pen == 'l0rl2_cplx': #basic msist algorithm
+                S_n = (sum([w_n[ix_].energy() for ix_ in w_n_it]) / g_i_half + epsilon[n]**2).invert()
+            else:    
+                for s in xrange(w_n[0].int_subbands-1,-1,-1):
+                    #variance estimate depends on the version of msist 
+                    #{l0rl2,l0rl2_bivar,l0rl2_group,vbmm,vbmm_hmt,poisson_deblur}
+                    #this gives different sparse penalties
+                    if self.str_sparse_pen[:7] == 'poisson':
+                        if 1: #self.str_sparse_pen == 'poisson_deblur': #msist with poisson-corrupted noise, 
+                            if s==0:
+                                ary_p_var = w_y.ary_lowpass
+                            else:
+                                int_level, int_orientation = w_n[0].lev_ori_from_subband(s)
+                                ary_p_var = w_y_scaling_coeffs[int_level]
+                            ary_p_var[ary_p_var<=0]=.01
+                        S_n.set_subband(s,(1.0 / ((1.0 / g_i) * nabs(w_n[0].get_subband(s))**2 + epsilon[n]**2)))
+                    elif self.str_sparse_pen == 'l0rl2_bivar':
+                        if s > 0:    
+                            s_parent_us = nabs(w_n[0].get_upsampled_parent(s))**2
+                            s_child = nabs(w_n[0].get_subband(s))**2
+                            yi,yi_mask = su.get_neighborhoods(s_child,1) #eq 8, Sendur BSWLVE paper, yzhang code doesn't do this...
+                            s_child_norm = sqrt(s_parent_us + s_child)
+                            sigsq_y = np.sum(yi,axis=yi.ndim-1)/np.sum(yi_mask,axis=yi.ndim-1)#still eq 8...
+                            sig = sqrt(np.maximum(sigsq_y-sigsq_n,0))
+                            w_tilde.set_subband(s, sqrt3*sigsq_n/sig) #the thresholding fn
+                            thresh = np.maximum(s_child_norm - w_tilde.get_subband(s),0)/s_child_norm #eq 5
+                            if np.mod(n,2)==0:    #update with the bivariate thresholded coefficients on every other iteration
+                                S_n.set_subband(s,(1.0 / 
+                                                   ((1.0 / g_i) *  
+                                                    nabs(thresh * w_n[0].get_subband(s))**2 + (epsilon[n]**2))))
+                            else:
+                                S_n.set_subband(s,(1.0 / 
+                                                   ((1.0 / g_i) * 
+                                                    nabs(w_n[0].get_subband(s))**2 + (epsilon[n]**2))))
+                        else:
+                            S_n.set_subband(s,(1.0 / ((1.0 / g_i) * nabs(w_n[0].get_subband(s))**2 + epsilon[n]**2)))
+                    elif self.str_sparse_pen == 'l0rl2_group': #msist-g, Shat is updated before this loop
                         if s==0:
-                            ary_p_var = w_y.ary_lowpass
+                            S_n.set_subband(s,(1.0 / ((1.0 / g_i) * nabs(w_n[0].get_subband(s))**2 + epsilon[n]**2)))
+                    elif self.str_sparse_pen == 'vbmm': #vbmm    
+                        if n == 0:
+                            sigma_n = 0
                         else:
-                            int_level, int_orientation = w_n[0].lev_ori_from_subband(s)
-                            ary_p_var = w_y_scaling_coeffs[int_level]
-                        ary_p_var[ary_p_var<=0]=.01
-                    S_n.set_subband(s,(1.0 / ((1.0 / g_i) * nabs(w_n[0].get_subband(s))**2 + epsilon[n]**2)))
-                elif self.str_sparse_pen == 'l0rl2_bivar':
-                    if s > 0:    
-                        s_parent_us = nabs(w_n[0].get_upsampled_parent(s))**2
-                        s_child = nabs(w_n[0].get_subband(s))**2
-                        yi,yi_mask = su.get_neighborhoods(s_child,1) #eq 8, Sendur BSWLVE paper, yzhang code doesn't do this...
-                        s_child_norm = sqrt(s_parent_us + s_child)
-                        sigsq_y = np.sum(yi,axis=yi.ndim-1)/np.sum(yi_mask,axis=yi.ndim-1)#still eq 8...
-                        sig = sqrt(np.maximum(sigsq_y-sigsq_n,0))
-                        w_tilde.set_subband(s, sqrt3*sigsq_n/sig) #the thresholding fn
-                        thresh = np.maximum(s_child_norm - w_tilde.get_subband(s),0)/s_child_norm #eq 5
-                        if np.mod(n,2)==0:    #update with the bivariate thresholded coefficients on every other iteration
-                            S_n.set_subband(s,(1.0 / 
-                                               ((1.0 / g_i) *  
-                                                nabs(thresh * w_n[0].get_subband(s))**2 + (epsilon[n]**2))))
-                        else:
-                            S_n.set_subband(s,(1.0 / 
-                                               ((1.0 / g_i) * 
-                                                nabs(w_n[0].get_subband(s))**2 + (epsilon[n]**2))))
-                    else:
-                        S_n.set_subband(s,(1.0 / ((1.0 / g_i) * nabs(w_n[0].get_subband(s))**2 + epsilon[n]**2)))
-                elif self.str_sparse_pen == 'l0rl2_group': #msist-g, Shat is updated before this loop
-                    if s==0:
-                        S_n.set_subband(s,(1.0 / ((1.0 / g_i) * nabs(w_n[0].get_subband(s))**2 + epsilon[n]**2)))
-                elif self.str_sparse_pen == 'vbmm': #vbmm    
-                    if n == 0:
-                        sigma_n = 0
-                    else:
-                        sigma_n = (1.0 / nu[n]**2 * alpha[s] + S_n.get_subband(s))**(-1)
-                    S_n.set_subband(s, (g_i + 2.0 * p_a) / 
-                                    (nabs(w_n[0].get_subband(s))**2 + sigma_n + 2.0 * b_n.get_subband(s)))
-                    b_n.set_subband(s, (p_k + p_a) / 
-                                    (S_n.get_subband(s) + p_theta))
-                elif self.str_sparse_pen == 'vbmm_hmt': #vbmm    
-                    if n == 0:
-                        sigma_n = 0
-                    else:
-                        sigma_n = (1.0 / nu[n]**2 * alpha[s] + S_n.get_subband(s))**(-1)
-                    # if s < w_n.int_subbands - w_n.int_orientations and s > 0:    
-                    if s > 0:    
-                        w_parent_us = w_n[0].get_upsampled_parent(s)
-                        alpha_dec = 2.25
-                        if s > S_n.int_orientations:
-                            s_child = S_n.subband_group_sum(s-S_n.int_orientations,'children')
-                            b_child = b_n.subband_group_sum(s-S_n.int_orientations,'children')
-                        else:
-                            s_child = 0 
-                            b_child = 0   
-                        if s < S_n.int_subbands - S_n.int_orientations:
-                            ap = ary_a[s+S_n.int_orientations]
-                        else:
-                            ap = .5
-                        w_en_avg = w_n[0].subband_group_sum(s,'parent_children')
-                        # S_n.set_subband(s, (g_i + 2.0 *  ary_a[s]) / 
-                        #                 (nabs(w_n.get_subband(s))**2 + sigma_n + 
-                        #                  2.0 * b_n.get_subband(s)))
-                        #the standard vbmm b with estimated shape parameter,works with the parent+4 children b
-                        S_n.set_subband(s, (g_i + 2.0 *  ary_a[s]) / 
-                                        (nabs(w_n[0].get_subband(s))**2 + sigma_n + 
-                                         2.0 * b_n.get_subband(s)))
-                        #the vbmm hmt model for s,b, ngk
-                        # S_n.set_subband(s, (g_i + 2.0 * ap + ary_a[s]) / 
-                        #                 (nabs(w_n.get_subband(s))**2 + sigma_n + 
-                        #                  2.0 * ((2**(-alpha_dec))*b_child + b_n.get_subband(s))))
-                        # the parent+4 children bs
-                        b_n.set_subband(s,ary_a[s] * w_en_avg)
-                        #the vbmm hmt model for s,b, ngk
-                        # b_n.set_subband(s,(4*ary_a[s]+ap) /
-                        #                 (s_child + 2**(-alpha_dec) * S_n.get_subband(s)))
-                        #other b estimators
-                        # b_n.set_subband(s,ary_a[s] * 1/2.0*(nabs(w_n.get_subband(s))**2+np.abs(w_parent_us)**2))
-                        # b_n.set_subband(s,ary_a[s] *  (2**(-alpha_dec)) * (np.abs(w_parent_us)**2))
-                    else: #no parents, so generate fixed-param gammas
-                        S_n.set_subband(s, (g_i + 2.0 * ary_a[s]) / 
-                                        (nabs(w_n[0].get_subband(s))**2 + sigma_n +
-                                         2.0 * b_n.get_subband(s)))
-                        b_n.set_subband(s, (p_k + ary_a[s]) / 
+                            sigma_n = (1.0 / nu[n]**2 * alpha[s] + S_n.get_subband(s))**(-1)
+                        S_n.set_subband(s, (g_i + 2.0 * p_a) / 
+                                        (nabs(w_n[0].get_subband(s))**2 + sigma_n + 2.0 * b_n.get_subband(s)))
+                        b_n.set_subband(s, (p_k + p_a) / 
                                         (S_n.get_subband(s) + p_theta))
-                else:
-                    raise ValueError('no such solver variant')
+                    elif self.str_sparse_pen == 'vbmm_hmt': #vbmm    
+                        if n == 0:
+                            sigma_n = 0
+                        else:
+                            sigma_n = (1.0 / nu[n]**2 * alpha[s] + S_n.get_subband(s))**(-1)
+                        # if s < w_n.int_subbands - w_n.int_orientations and s > 0:    
+                        if s > 0:    
+                            w_parent_us = w_n[0].get_upsampled_parent(s)
+                            alpha_dec = 2.25
+                            if s > S_n.int_orientations:
+                                s_child = S_n.subband_group_sum(s-S_n.int_orientations,'children')
+                                b_child = b_n.subband_group_sum(s-S_n.int_orientations,'children')
+                            else:
+                                s_child = 0 
+                                b_child = 0   
+                            if s < S_n.int_subbands - S_n.int_orientations:
+                                ap = ary_a[s+S_n.int_orientations]
+                            else:
+                                ap = .5
+                            w_en_avg = w_n[0].subband_group_sum(s,'parent_children')
+                            # S_n.set_subband(s, (g_i + 2.0 *  ary_a[s]) / 
+                            #                 (nabs(w_n.get_subband(s))**2 + sigma_n + 
+                            #                  2.0 * b_n.get_subband(s)))
+                            #the standard vbmm b with estimated shape parameter,works with the parent+4 children b
+                            S_n.set_subband(s, (g_i + 2.0 *  ary_a[s]) / 
+                                            (nabs(w_n[0].get_subband(s))**2 + sigma_n + 
+                                             2.0 * b_n.get_subband(s)))
+                            #the vbmm hmt model for s,b, ngk
+                            # S_n.set_subband(s, (g_i + 2.0 * ap + ary_a[s]) / 
+                            #                 (nabs(w_n.get_subband(s))**2 + sigma_n + 
+                            #                  2.0 * ((2**(-alpha_dec))*b_child + b_n.get_subband(s))))
+                            # the parent+4 children bs
+                            b_n.set_subband(s,ary_a[s] * w_en_avg)
+                            #the vbmm hmt model for s,b, ngk
+                            # b_n.set_subband(s,(4*ary_a[s]+ap) /
+                            #                 (s_child + 2**(-alpha_dec) * S_n.get_subband(s)))
+                            #other b estimators
+                            # b_n.set_subband(s,ary_a[s] * 1/2.0*(nabs(w_n.get_subband(s))**2+np.abs(w_parent_us)**2))
+                            # b_n.set_subband(s,ary_a[s] *  (2**(-alpha_dec)) * (np.abs(w_parent_us)**2))
+                        else: #no parents, so generate fixed-param gammas
+                            S_n.set_subband(s, (g_i + 2.0 * ary_a[s]) / 
+                                            (nabs(w_n[0].get_subband(s))**2 + sigma_n +
+                                             2.0 * b_n.get_subband(s)))
+                            b_n.set_subband(s, (p_k + ary_a[s]) / 
+                                            (S_n.get_subband(s) + p_theta))
+                    else:
+                        raise ValueError('no such solver variant')
                 #update current solution
                 if (self.str_sparse_pen == 'poisson_deblur_sp'):#spatial domain thresholding goes here
                     w_n[0].set_subband(s, \
@@ -298,7 +310,7 @@ class MSIST(Solver):
                     w_n[0].set_subband(s, \
                       (alpha[s] * w_n[0].get_subband(s) + w_resid[0].get_subband(s)) / \
                       (alpha[s] + (nu[n]**2+ary_p_var) * S_n.get_subband(s)))
-                elif (self.str_sparse_pen[[:11]] == 'l0rl2_group'):
+                elif (self.str_sparse_pen[:11] == 'l0rl2_group'):
                     if s>0:
                         for ix_ in w_n_it:
                             w_n[ix_].set_subband(s,
@@ -318,9 +330,9 @@ class MSIST(Solver):
             if self.str_sparse_pen[-4:] == 'cplx':    
                 x_n = (~W * w_n[0]) + 1j*(~W * w_n[0])
                 if self.phase_encoded: #need to apply boundary conditions for phase encoded velocity 
-                    m_n = abs(x_n)
-                    theta_n =su.phase_unwrap(angle(x_n),dict_in['dict_global_lims'],dict_in['ls_vcorrect_secs'])
-                    if self.get_value('iterationmask'): #need to apply boundary conditions for phase encoded velocity 
+                    m_n = nabs(x_n)
+                    theta_n = su.phase_unwrap(angle(x_n),dict_in['dict_global_lims'],dict_in['ls_vcorrect_secs'])
+                    if self.get_val('iterationmask'): #need to apply boundary conditions for phase encoded velocity 
                         theta_n *= dict_in['mask']
                     x_n = m_n*exp(1j*theta_n)
             else:    
@@ -333,6 +345,9 @@ class MSIST(Solver):
                 if self.spatial_threshold:
                     x_n[x_n<b]=0.0
             dict_in['x_n'] = x_n
+            if self.str_sparse_pen[-4:] == 'cplx':    
+                dict_in['theta_n'] = angle(x_n)
+                dict_in['magnitude_n'] = nabs(x_n)
             #need to reset the border of this iterate for the next implicit convolution(msistp)
             if self.str_sparse_pen=='poisson_deblur':
                 x_n=su.pad_center(x_n,dict_in['x_0'].shape)
@@ -344,9 +359,9 @@ class MSIST(Solver):
             #reprojection for the duplicated variables of l0rl2_group variant
             if self.str_sparse_pen[:11] == 'l0rl2_group':
                 ls_w_hat_n = [[ls_w_hat_n[ix_][j]*ls_S_hat_sup[j]+w_n[ix_]*((ls_S_hat_sup[j]+(-1))*(-1))
-                              for j in xrange(len(ls_S_hat_sup))] for ix_ in w_n_it]
+                              for j in dup_it] for ix_ in w_n_it]
                 ls_w_hat_n = [[W*((~W)*w_hat_n) for w_hat_n in ls_w_hat_n[ix_]] for ix_ in w_n_it]
-                w_bar_n = [W*((~W)*w_bar_n[ix_]) for ix_ in w_in_it]
+                w_bar_n = [W*((~W)*w_bar_n[ix_]) for ix_ in w_n_it]
                 dict_in['w_bar_n'] = w_bar_n
                 dict_in['ls_w_hat_n'] = ls_w_hat_n
             dict_in['w_n'] = w_n
@@ -397,11 +412,14 @@ class MSIST(Solver):
         ws_dummy=dict_in['ws_dummy']
         tausq_AtA=dict_in['tausq_AtA']
         ls_S_hat_sup=dict_in['ls_S_hat_sup']
+        g_i_half = dict_in['g_i_half']
+        w_n_it = dict_in['w_n_it']
+        dup_it = dict_in['dup_it']
         #perform the updats
-        ls_S_hat_n=G*[1/g_i_half*sum([ls_w_hat_n[ix_][ix2].energy() for ix_ in w_n_it])
-                      for ix2 in xrange(len(ls_w_hat_n))] #eq 11
+        ls_S_hat_n=G*[sum([ls_w_hat_n[ix_][ix2].energy() for ix_ in w_n_it]) / g_i_half
+                      for ix2 in dup_it] #eq 11
         ls_S_hat_n=[ls_S_hat_sup[j].flatten()*(1.0/(ls_S_hat_n[j]+epsilon**2))
-                    for j in xrange(len(ls_S_hat_n))] #eq 11
+                    for j in dup_it] #eq 11
         S_hat_n_csr=su.flatten_list_to_csr(ls_S_hat_n)
         ls_w_hat_n=[(~A)*(w_n[ix_]*(tau**2)) for ix_ in w_n_it] #eq 21
         w_n_hat_flat=[su.flatten_list(ls_w_hat_n[ix_]) for ix_ in w_n_it]
