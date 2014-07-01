@@ -180,14 +180,15 @@ class MSIST(Solver):
                 f_resid = y_hat - H * x_n
             else:    
                 f_resid = ifftn(y_hat - H * x_n)
+                H.set_output_fourier(False)
             if (self.str_sparse_pen == 'poisson_deblur_sp'):#spatial domain thresholding goes here
                 f_resid/=(dict_in['y']+nu[n]**2)
-            H.set_output_fourier(False)
             #Landweber projection back to observation domain
             if self.str_sparse_pen[-4:] == 'cplx': 
-                w_resid = [W * (~H * f_resid).real, W * (~H * f_resid).imag]
+                HtHf = (~H) * f_resid
+                w_resid = [W * (HtHf).real, W * (HtHf).imag]
             else:
-                w_resid = [W * (~H * f_resid)]
+                w_resid = [W * ((~H) * f_resid)]
             #the bivariate shrinkage penalty in l0rl2 (coefficient neighborhood averags)
             if self.str_sparse_pen == 'l0rl2_bivar' and n==0:
                 sigsq_n = self.get_val('nustop', True)**2
@@ -301,7 +302,9 @@ class MSIST(Solver):
                                             (S_n.get_subband(s) + p_theta))
                     else:
                         raise ValueError('no such solver variant')
-                #update current solution
+                #########################    
+                #update current solution#
+                #########################    
                 if (self.str_sparse_pen == 'poisson_deblur_sp'):#spatial domain thresholding goes here
                     w_n[0].set_subband(s, \
                       (alpha[s] * w_n[0].get_subband(s) + w_resid[0].get_subband(s)) / \
@@ -322,17 +325,19 @@ class MSIST(Solver):
                                             (alpha[s] * w_n[ix_].get_subband(s) + w_resid[ix_].get_subband(s)) / 
                                             (alpha[s] + (nu[n]**2) * S_n.get_subband(s)))
                 else: 
-                    w_n[0].set_subband(s, 
-                                    (alpha[s] * w_n[0].get_subband(s) + w_resid[0].get_subband(s)) / 
-                                    (alpha[s] + (nu[n]**2) * S_n.get_subband(s)))
+                    for ix_ in w_n_it:
+                        w_n[ix_].set_subband(s, 
+                                           (alpha[s] * w_n[ix_].get_subband(s) + w_resid[ix_].get_subband(s)) / 
+                                           (alpha[s] + (nu[n]**2) * S_n.get_subband(s)))
                 #end updating subbands   
             #project back to spatial domain for any spatial domain operations    
             if self.str_sparse_pen[-4:] == 'cplx':    
-                x_n = (~W * w_n[0]) + 1j*(~W * w_n[0])
+                x_n = np.asfarray(~W * w_n[0],'complex128') 
+                x_n += 1j*np.asfarray(~W * w_n[1],'complex128')
                 if self.phase_encoded: #need to apply boundary conditions for phase encoded velocity 
                     m_n = nabs(x_n)
                     theta_n = su.phase_unwrap(angle(x_n),dict_in['dict_global_lims'],dict_in['ls_vcorrect_secs'])
-                    if self.get_val('iterationmask'): #need to apply boundary conditions for phase encoded velocity 
+                    if self.get_val('iterationmask',True): #need to apply boundary conditions for phase encoded velocity 
                         theta_n *= dict_in['mask']
                     x_n = m_n*exp(1j*theta_n)
             else:    
