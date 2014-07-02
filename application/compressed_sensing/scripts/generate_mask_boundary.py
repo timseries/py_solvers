@@ -11,12 +11,17 @@ disk_struct_el = disk(2)
 imones = np.ones(mask.shape, dtype='bool')
 boundary_mask = mask - (imones - dilation(imones - mask, disk_struct_el))
 boundary_mask = np.asarray(boundary_mask,dtype='bool')
+not_boundary_mask = np.asarray(mask*(1-boundary_mask),dtype='bool')
 
 plt.imshow(mask)
 plt.figure()
 plt.imshow(boundary_mask)
 plt.figure()
 plt.imshow(boundary_mask*mask)
+plt.figure()
+plt.imshow(not_boundary_mask)
 
 #save
 np.savez_compressed('/home/tim/repos/py_solvers/application/data/velocity_imaging/reducing_times_benchmark_spatial_mask_boundary.npz',boundary_mask)
+
+np.savez_compressed('/home/tim/repos/py_solvers/application/data/velocity_imaging/reducing_times_benchmark_spatial_mask_not_boundary.npz',not_boundary_mask)
