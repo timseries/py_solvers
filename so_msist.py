@@ -42,7 +42,7 @@ class MSIST(Solver):
         if self.alpha_method=='':
             self.alpha_method = 'spectrum'
         self.str_group_structure = self.get_val('grouptypes',False)
-        self.phase_encoded = self.get_val('phaseencoded',)
+        self.phase_encoded = self.get_val('phaseencoded',True)
         
     def solve(self,dict_in):
         """
@@ -302,9 +302,10 @@ class MSIST(Solver):
                                             (S_n.get_subband(s) + p_theta))
                     else:
                         raise ValueError('no such solver variant')
-                #########################    
-                #update current solution#
-                #########################    
+            #########################    
+            #update current solution#
+            #########################
+            for s in xrange(w_n[0].int_subbands-1,-1,-1):    
                 if (self.str_sparse_pen == 'poisson_deblur_sp'):#spatial domain thresholding goes here
                     w_n[0].set_subband(s, \
                       (alpha[s] * w_n[0].get_subband(s) + w_resid[0].get_subband(s)) / \
@@ -334,11 +335,13 @@ class MSIST(Solver):
             if self.str_sparse_pen[-4:] == 'cplx':    
                 x_n = np.asfarray(~W * w_n[0],'complex128') 
                 x_n += 1j*np.asfarray(~W * w_n[1],'complex128')
+                m_n = nabs(x_n)
+                theta_n = angle(x_n)
                 if self.phase_encoded: #need to apply boundary conditions for phase encoded velocity 
-                    m_n = nabs(x_n)
                     theta_n = su.phase_unwrap(angle(x_n),dict_in['dict_global_lims'],dict_in['ls_vcorrect_secs'])
-                    if self.get_val('iterationmask',True): #need to apply boundary conditions for phase encoded velocity 
+                    if self.get_val('iterationmask',True): #apply boundary conditions for phase encoded velocity 
                         theta_n *= dict_in['mask']
+                        # m_n *= dict_in['mask']
                     x_n = m_n*exp(1j*theta_n)
             else:    
                 x_n = ~W * w_n[0]
@@ -351,8 +354,8 @@ class MSIST(Solver):
                     x_n[x_n<b]=0.0
             dict_in['x_n'] = x_n
             if self.str_sparse_pen[-4:] == 'cplx':    
-                dict_in['theta_n'] = angle(x_n)
-                dict_in['magnitude_n'] = nabs(x_n)
+                dict_in['theta_n'] = theta_n
+                dict_in['magnitude_n'] = m_n
             #need to reset the border of this iterate for the next implicit convolution(msistp)
             if self.str_sparse_pen=='poisson_deblur':
                 x_n=su.pad_center(x_n,dict_in['x_0'].shape)

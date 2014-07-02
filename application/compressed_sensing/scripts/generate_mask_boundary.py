@@ -10,6 +10,7 @@ mask = np.load(mask_path)['arr_0']
 disk_struct_el = disk(2)
 imones = np.ones(mask.shape, dtype='bool')
 boundary_mask = mask - (imones - dilation(imones - mask, disk_struct_el))
+boundary_mask = np.asarray(boundary_mask,dtype='bool')
 
 plt.imshow(mask)
 plt.figure()
