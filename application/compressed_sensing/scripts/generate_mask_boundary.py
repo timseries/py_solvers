@@ -4,7 +4,7 @@ import numpy as np
 from skimage.morphology import dilation,disk
 
 #input mask path
-mask_path = '/home/tim/repos/py_solvers/application/data/velocity_imaging/reducing_times_benchmark_spatial_mask.npz'
+mask_path = '/home/tim/repos/py_solvers/application/data/velocity_imaging/2dsine_spatial_mask.npz'
 mask = np.load(mask_path)['arr_0']
 
 disk_struct_el = disk(2)
@@ -21,7 +21,6 @@ plt.imshow(boundary_mask*mask)
 plt.figure()
 plt.imshow(not_boundary_mask)
 
-#save
-np.savez_compressed('/home/tim/repos/py_solvers/application/data/velocity_imaging/reducing_times_benchmark_spatial_mask_boundary.npz',boundary_mask)
+#save boundary mask
+np.savez_compressed('/home/tim/repos/py_solvers/application/data/velocity_imaging/2dsine_spatial_mask_boundary.npz',boundary_mask)
 
-np.savez_compressed('/home/tim/repos/py_solvers/application/data/velocity_imaging/reducing_times_benchmark_spatial_mask_not_boundary.npz',not_boundary_mask)
