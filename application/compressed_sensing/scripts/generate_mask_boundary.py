@@ -24,3 +24,5 @@ plt.imshow(not_boundary_mask)
 #save boundary mask
 np.savez_compressed('/home/tim/repos/py_solvers/application/data/velocity_imaging/2dsine_spatial_mask_boundary.npz',boundary_mask)
 
+np.savez_compressed('/home/tim/repos/py_solvers/application/data/velocity_imaging/2dsine_sample_mask.npz',sample_mask)
+

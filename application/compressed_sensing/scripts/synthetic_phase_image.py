@@ -4,10 +4,12 @@ import numpy as np
 from mpldatacursor import datacursor
 
 #generate a 2-dimensional sinusoid
+str_type='qbgn'
+
 periods_x = 3.0
 periods_y = 3.0
-sz_x = 128.0
-sz_y = 128.0
+sz_x = 168.0
+sz_y = 168.0
 
 x = np.arange(sz_x)/sz_x*periods_x*2.0*np.pi
 y = np.arange(sz_y)/sz_y*periods_y*2.0*np.pi

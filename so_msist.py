@@ -391,7 +391,7 @@ class MSIST(Solver):
                     #phase wrapping in very high dynamic-phase regions
                     theta_n = su.phase_unwrap(angle(x_n),
                                               dict_in['dict_global_lims'],
-                                              dict_in['ls_vcorrect_secs'])
+                                              dict_in['ls_local_lim_secs'])
                     if self.get_val('iterationmask',True): #apply boundary conditions for phase encoded velocity 
                         theta_n *= dict_in['mask']
                     x_n = m_n * exp(1j*theta_n)
