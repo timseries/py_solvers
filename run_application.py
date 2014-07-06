@@ -4,6 +4,7 @@ Python script to prompt the user with a number of applications. Then allow selec
 """
 import os
 from py_utils.helpers import convertStr
+from py_utils.parameter_struct import ParameterStruct
 import pdb
 
 def main():
@@ -27,9 +28,14 @@ def main():
         else:
             print 'invalid selection, quitting...'
             return
-    str_path=str_path[0:-1]    
+    str_path=str_path[0:-1] 
     print 'selected: ' + str_path
-    os.system(ls_prompts[0]+'/main.py ' + str_path)
+    if '_all.ini' in str_path: #spawn lots of jobs in parallel
+        print 'spawning parameter sweep configs from this master config'
+        ps_params = ParameterStruct(str_path)
+        ls_file_names = ps_params.generate_configs()
+        for file_name in ls_file_names:
+            os.system(ls_prompts[0]+'/main.py ' + file_name)
     
 if __name__ == "__main__":
     main()

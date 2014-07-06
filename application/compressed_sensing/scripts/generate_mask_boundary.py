@@ -7,7 +7,7 @@ from skimage.morphology import dilation,disk
 mask_path = '/home/tim/repos/py_solvers/application/data/velocity_imaging/2dsine_spatial_mask.npz'
 mask = np.load(mask_path)['arr_0']
 
-disk_struct_el = disk(2)
+disk_struct_el = disk(4)
 imones = np.ones(mask.shape, dtype='bool')
 boundary_mask = mask - (imones - dilation(imones - mask, disk_struct_el))
 boundary_mask = np.asarray(boundary_mask,dtype='bool')
@@ -22,7 +22,6 @@ plt.figure()
 plt.imshow(not_boundary_mask)
 
 #save boundary mask
-np.savez_compressed('/home/tim/repos/py_solvers/application/data/velocity_imaging/2dsine_spatial_mask_boundary.npz',boundary_mask)
+np.savez_compressed('/home/tim/repos/py_solvers/application/data/velocity_imaging/2dsine_spatial_mask_boundary.npz',boundary_mask*mask)
 
-np.savez_compressed('/home/tim/repos/py_solvers/application/data/velocity_imaging/2dsine_sample_mask.npz',sample_mask)
 
