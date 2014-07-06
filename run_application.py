@@ -34,8 +34,11 @@ def main():
         print 'spawning parameter sweep configs from this master config'
         ps_params = ParameterStruct(str_path)
         ls_file_names = ps_params.generate_configs()
-        for file_name in ls_file_names:
-            os.system(ls_prompts[0]+'/main.py ' + file_name)
+    else:    
+        ls_file_names = [str_path] #single file execution mode
+    for file_name in ls_file_names:
+        print 'starting: ' + file_name
+        os.system(ls_prompts[0]+'/main.py ' + file_name)
     
 if __name__ == "__main__":
     main()
