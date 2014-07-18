@@ -25,17 +25,19 @@ gauss_filter = gaussian((gauss_szx, gauss_szy),(gauss_sigma,gauss_sigma))
 x = np.arange(sz_x)/sz_x*periods_x*2.0*np.pi
 y = np.arange(sz_y)/sz_y*periods_y*2.0*np.pi
 
-x,y = np.mgrid[0.1:.1+2.0 * np.pi * periods_x : 1 / sz_x * periods_x * 2.0 * np.pi, 
-               0.1:.1+2.0 * np.pi * periods_y : 1 / sz_y * periods_y * 2.0 * np.pi]
+x,y = np.mgrid[0:2.0 * np.pi * periods_x : 1 / sz_x * periods_x * 2.0 * np.pi, 
+               0:2.0 * np.pi * periods_y : 1 / sz_y * periods_y * 2.0 * np.pi]
 
 z = np.sin(x)*np.sin(y)
 
 max_phase = 5.0
 min_phase = -.5
 
-
 plt.imshow(z)
-
+plt.figure()
+zfft = fftshift(fftn(z))
+plt.imshow(log(abs(zfft)))
+# datacursor(display='single')
 #start with 
 # z=0
 gauss_random = np.random.rand(int(sz_x),int(sz_y))
