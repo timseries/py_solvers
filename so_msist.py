@@ -92,13 +92,11 @@ class MSIST(Solver):
             dict_in['magnitude_n'] = nabs(x_n)
             w_n = [W * x_n.real, W * x_n.imag]
             g_i = 2 * (w_n[0].is_wavelet_complex() + 1)
-            g_i_half = g_i / 2 #used to normalize S for group averaging
         else:
             w_n = [W * x_n]
             g_i = (w_n[0].is_wavelet_complex() + 1)
-            g_i_half = g_i #used to normalize S for group averaging
-            
-        w_n_it = xrange(g_i_half) #iterator for w_n
+        w_n_len = len(w_n)    
+        w_n_it = xrange(w_n_len) #iterator for w_n
         dict_in['w_n'] = w_n
         
         #initialize the precision matrix with zeros
@@ -137,8 +135,8 @@ class MSIST(Solver):
             ls_w_hat_n = [[w_n[ix_]*1 for j in dup_it] for ix_ in w_n_it]
 
             #initialize non-overlapping space precision
-            ls_S_hat_n = [((sum([w_n[ix].energy() for ix in w_n_it]) / g_i_half) 
-                           + epsilon[0]**2).invert()for int_dup in dup_it]
+            ls_S_hat_n = [((sum([w_n[ix].energy() for ix in w_n_it]) / g_i) 
+                           + epsilon[0]**2).invert() for int_dup in dup_it]
             w_bar_n = [w_n[ix_]*1 for ix_ in w_n_it]
             
             #using the structure of A, initialize the support of Shat, what
@@ -155,15 +153,15 @@ class MSIST(Solver):
             ls_S_hat_sup = [(w_n[0]*0).unflatten(S_sup) for S_sup in ls_S_hat_sup]
             ls_S_hat_sup = [S_hat_n_sup.nonzero() for S_hat_n_sup in ls_S_hat_sup]
 
-            #precompute tausq_AtA (doesn't change from one iteration to the next)
-            tausq_AtA = (tau**2)*(A.csr_avg.transpose()*A.csr_avg).tocsr()
+            #precompute AtA (doesn't change from one iteration to the next)
+            AtA = (A.csr_avg.transpose()*A.csr_avg).tocsr()
             
             #initialize S_hat_bar parameters for efficient matrix inverses
             Shatbar_p_filename=A.file_path.split('.pkl')[0]+'Shatbar.pkl'
             if not os.path.isfile(Shatbar_p_filename):
                 dict_in['col_offset']=A.int_size
                 S_hat_n_csr=su.flatten_list_to_csr(ls_S_hat_sup)
-                su.inv_block_diag(tausq_AtA+S_hat_n_csr,dict_in)
+                su.inv_block_diag((tau**2) * AtA + S_hat_n_csr, dict_in)
                 filehandler=open(Shatbar_p_filename, 'wb')
                 cPickle.dump(dict_in['dict_bdiag'],filehandler)
                 del S_hat_n_csr
@@ -179,12 +177,12 @@ class MSIST(Solver):
             dict_in['G']=G
             dict_in['A']=A
             dict_in['W']=W
-            dict_in['tausq_AtA']=tausq_AtA
+            dict_in['AtA']=AtA
             dict_in['ls_S_hat_sup']=ls_S_hat_sup
             dict_in['w_n_it']=w_n_it
             dict_in['dup_it']=dup_it
             dict_in['ws_dummy']=w_n[0]*0
-            dict_in['g_i_half']=g_i_half
+            dict_in['g_i']=g_i
             
             self.update_duplicates(dict_in,nu[0],epsilon[0],tau)    
             
@@ -261,14 +259,15 @@ class MSIST(Solver):
                 self.str_sparse_pen[-5:] != 'bivar'): 
                 if self.str_sparse_pen == 'l0rl2_group':
                     S0_n = nsum([nabs(w_n[ix].ary_lowpass)**2 for ix in w_n_it],
-                                axis=0) / g_i_half  + epsilon[n]**2
+                                axis=0) / g_i  + epsilon[n]**2
                     S0_n = 1.0 / S0_n
                 else:    
-                    S_n = (sum([w_n[ix_].energy() for ix_ in w_n_it]) / g_i_half 
+                    S_n = (sum([w_n[ix_].energy() for ix_ in w_n_it]) / g_i
                            + epsilon[n]**2).invert()
             elif (self.str_sparse_pen[0:5] == 'vbmm' and 
                   self.str_sparse_pen[-5:] != 'hmt'): 
                 cplx_norm = 1.0 + self.input_complex
+                #TODO(tim): check this is accurate in complex case
                 S_n = ((g_i + 2.0 * p_a) * 
                        (sum([w_n[ix_].energy() for ix_ in w_n_it]) / cplx_norm
                        + sigma_n + 2.0 * b_n).invert())
@@ -480,20 +479,20 @@ class MSIST(Solver):
         A=dict_in['A']
         W=dict_in['W']
         ws_dummy=dict_in['ws_dummy']
-        tausq_AtA=dict_in['tausq_AtA']
+        AtA=dict_in['AtA']
         ls_S_hat_sup=dict_in['ls_S_hat_sup']
-        g_i_half = dict_in['g_i_half']
+        g_i = dict_in['g_i']
         w_n_it = dict_in['w_n_it']
         dup_it = dict_in['dup_it']
         #perform the updats
-        ls_S_hat_n=G*[sum([ls_w_hat_n[ix_][ix2].energy() for ix_ in w_n_it]) / g_i_half
+        ls_S_hat_n=G*[sum([ls_w_hat_n[ix_][ix2].energy() for ix_ in w_n_it]) / g_i
                       for ix2 in dup_it] #eq 11
         ls_S_hat_n=[ls_S_hat_sup[j].flatten()*(1.0/(ls_S_hat_n[j]+epsilon**2))
                     for j in dup_it] #eq 11
         S_hat_n_csr=su.flatten_list_to_csr(ls_S_hat_n)
         ls_w_hat_n=[(~A)*(w_n[ix_]*(tau**2)) for ix_ in w_n_it] #eq 21
         w_n_hat_flat=[su.flatten_list(ls_w_hat_n[ix_]) for ix_ in w_n_it]
-        S_hat_bar_inv=su.inv_block_diag(tausq_AtA + (nu**2)*S_hat_n_csr,dict_in)
+        S_hat_bar_inv=su.inv_block_diag((tau**2) * AtA + (nu**2) * S_hat_n_csr, dict_in)
         w_n_hat_flat=[S_hat_bar_inv*w_n_hat_flat[ix_] for ix_ in w_n_it] #eq21 ctd
         ls_w_hat_n_unflat=[unflat_list(w_n_hat_flat[ix_],A.duplicates) for ix_ in w_n_it]
         #the +0 in the next line returns a new WS object...

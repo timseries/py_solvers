@@ -31,17 +31,18 @@ x,y = np.mgrid[0:2.0 * np.pi * periods_x : 1 / sz_x * periods_x * 2.0 * np.pi,
 z = np.sin(x)*np.sin(y)
 
 max_phase = 5.0
-min_phase = -.5
+min_phase = -1.0
 
 plt.imshow(z)
 plt.figure()
 zfft = fftshift(fftn(z))
 plt.imshow(log(abs(zfft)))
-# datacursor(display='single')
+datacursor(display='single')
 #start with 
 # z=0
 gauss_random = np.random.rand(int(sz_x),int(sz_y))
-z += gauss_random / np.max(np.abs(gauss_random))
+gauss_random = gauss_random / np.max(np.abs(gauss_random))
+z += gauss_random
 
 #now blur with a Gaussian
 
@@ -58,16 +59,16 @@ colorbar()
 # datacursor(display='single')
 
 mask = zsmooth.copy()
-mask[mask <= (min_phase+1)] = False
-mask[mask > (min_phase+1)] = True
+mask[mask <= (0.0)] = False
+mask[mask > (0.0)] = True
 mask = np.array(mask, dtype='bool')
-
+plt.imshow(mask)
 plt.imshow(zsmooth*mask)
 
 zsmooth_fft = fftshift(fftn(zsmooth))
 plt.imshow(log(nabs(zsmooth_fft)))
 
-plt.imshow(log(nabs(fftshift(fftn(dict_in['theta'])))))
+# plt.imshow(log(nabs(fftshift(fftn(dict_in['theta'])))))
 
 # plt.figure()
 # x_vel_enc = np.load('/home/tim/repos/py_solvers/application/data/velocity_imaging/reducing_times_benchmark_fully_sampled_phase.npz')['arr_0']
@@ -82,18 +83,20 @@ cx,cy = mgrid[0:imszx,0:imszy]
 circle_dist = (cx-imszx/2)**2 + (cy-imszy/2)**2
 circle = (circle_dist < (120-imszx/2)**2)
 plt.imshow(log(nabs(zsmooth_fft))*circle)
-zsmooth_lpf_fft = zsmooth_fft*circle
+# zsmooth_lpf_fft = zsmooth_fft*circle
+zsmooth_lpf_fft = zsmooth_fft*1 #don't need lpf anymore, but if we do uncomment the line above, and comment this on out
 
 zsmooth_lpf = np.real(ifftn(ifftshift(zsmooth_lpf_fft)))
 plt.imshow(zsmooth_lpf)
+plt.colorbar()
 
 plt.figure()
 plt.imshow(log(abs(fftshift(fftn(zsmooth_lpf)))))
 plt.figure()
 # plt.imshow(log(abs(fftshift(fftn(zsmooth_lpf*mask)))))
 # plt.figure()
-plt.imshow(mask * zsmooth_lpf)
-
+plt.imshow(mask * zsmooth_lpf,cmap='gray')
+plt.colorbar()
 signal = 1.0 * np.exp(1j * zsmooth_lpf)
 
 #simple phase unwrapping
@@ -102,6 +105,7 @@ phase[phase < min_phase] += 2.0 * np.pi
 phase[phase > max_phase] -= 2.0 * np.pi
 
 plt.imshow((phase))
+plt.colorbar()
 
 np.savez_compressed('/home/tim/repos/py_solvers/application/data/velocity_imaging/2dsine_fully_sampled_data.npz',signal)
 

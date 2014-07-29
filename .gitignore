@@ -3,6 +3,9 @@
 *.sh.*
 *.log
 
+#big data matrices
+*64,64,64*
+
 # C extensions
 *.so
 
