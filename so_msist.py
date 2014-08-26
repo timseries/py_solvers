@@ -1,4 +1,4 @@
-#p!/usr/bin/python -tt
+#!/usr/bin/python -tt
 import numpy as np
 from numpy import arange, conj, sqrt,median, abs as nabs, exp, maximum as nmax, angle, sum as nsum
 from numpy.fft import fftn, ifftn
