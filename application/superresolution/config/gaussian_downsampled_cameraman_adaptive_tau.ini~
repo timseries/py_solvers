@@ -1,0 +1,212 @@
+[Application1b]
+name = blurredCameraman
+
+[Input1]
+name = Input
+filedir = ../../data/standard_test_images
+filemember = 
+filename = cameraman.tif
+
+[Input2]
+name = Input
+filedir = ../../data/avg_matrices
+filemember = 
+filename = 
+
+[Preprocess1]
+name = Preprocess
+
+[Observe1]
+name = Observe
+observationtype = convolution_downsample
+domain = fourier
+modalities = ModalityArray1
+transforms = TransformArray1
+noisedistribution = gaussian
+noisemean = 0
+noisevariance = 0.34809
+noiseinterval = 0 1
+wienerfactor = .001
+seed = 1
+
+[Transform1]
+name = DTCWT
+nlevels = 4
+biort = near_sym_b
+qshift = qshift_b
+csource = 0
+
+[Transform2]
+name = Average
+grouptype = parentchildren
+averagetype = cluster
+sparsematrixinput = Input2
+
+[Transform3]
+name = Average
+grouptype = parentchildren
+averagetype = group
+sparsematrixinput = Input2
+
+[Modality1_1]
+name = Blur
+type = gaussian
+gaussiansigma = 1 1
+size = 16 16
+dimension = 2
+csource = 0
+
+[Modality1_2]
+name = Downsample
+downsamplefactor = 1 2
+csource = 0
+
+[Modality1_3]
+name = Downsample
+downsamplefactor = 1 2
+offset = 0 1
+csource = 0
+
+[ModalityArray1]
+name = OperatorComp
+operators = Modality1_1,Modality1_2
+
+[TransformArray1]
+name = OperatorComp
+operators = Transform1
+
+[Solver1]
+name = MSIST
+sparsepenalty = l0rl2_group
+alphamethod = power_iteration
+nuepsilonmethod = geometric
+epsilonstart = 3
+epsilonstop = .05
+nustart = 50
+nustop = .175
+decay = .8
+tau = .1 .1 .15 .25 .25 .15 .1 .001 .1 .2 .2 .1 .001 .15 .25 .25 .15 .1 .1 .001 .01 .15 .15 .01 .001
+p_a = 8.0
+p_b_0 = 0.0
+p_theta = 1E-6
+p_k = 0.5
+alpha = .5 .1 .01 .1 .1 .01 .05 .15 .05 .15 .15 .05 .3 .3 .3 .3 .3 .3 .3 .3 .3 .3 .3 .3 .3
+modalities = ModalityArray1
+transforms = TransformArray1
+clusteraverage = Transform2
+groupaverage = Transform3
+results = Results1
+nitn = 100
+
+[Results1]
+name = Results
+metrics = ISNR3,SRE1,Scalar1,Scalar2
+desktop = 1
+figuregridwidth = 2
+figuregridheight = 2
+outputdirectory = ~/repos/scratch/thesis_results/superresolution
+overwriteresults = 0
+disablefigures = 0
+rowoffset = 0
+
+[ISNR1]
+name = ISNR
+title = ISNR
+transform = Modality1_3
+key = ISNR_even
+ylabel = ISNR (dB)
+print = 1
+cropplot = 40 0
+figurelocation = 0
+
+[ISNR2]
+name = ISNR
+title = ISNR
+transform = Modality1_2
+comparisony = DHxpn
+key = ISNR_odd
+ylabel = ISNR (dB)
+print = 1
+cropplot = 40 0
+figurelocation = 1
+
+[ISNR3]
+name = ISNR
+title = ISNR
+comparisony = Hxpn
+key = ISNR_all
+ylabel = ISNR (dB)
+print = 1
+figurelocation = 0
+
+[SRE1]
+name = SRE
+title = Subband Relative Error
+key = SRE
+ylabel = SRE
+print = 1
+logy = 1
+ylim = 10E-9 10E3
+legendcols = 4
+hascsv = 0
+figurelocation = 1
+
+[OutputImage1]
+name = OutputImage
+title = Ground Truth
+key = x
+lastframeonly = 1
+updateonce = 1
+figurelocation = 4
+
+[OutputImage2]
+name = OutputImage
+title = Initial Estimate
+key = x_0
+lastframeonly = 1
+updateonce = 1
+figurelocation = 5
+
+[OutputImage3]
+name = OutputImage
+title = Observation
+key = x
+lastframeonly = 1
+updateonce = 1
+figurelocation = 6
+
+[OutputImage4]
+name = OutputImage
+title = Current Iterate
+key = x_n
+lastframeonly = 1
+figurelocation = 7
+
+[Scalar1]
+name = Scalar
+title = $\nu^2$
+key = nu_sq
+ylabel = $\nu^2$
+figurelocation = 2
+
+[Scalar2]
+name = Scalar
+title = $\epsilon^2$
+key = epsilon_sq
+ylabel = $\epsilon^2$
+figurelocation = 3
+
+[Scalar3]
+name = Scalar
+title = $\|x-\bar x\|^2$
+key = fideilty_norm_sq
+ylabel = $\|x-\bar x\|^2$
+figurelocation = 3
+
+[Scalar4]
+name = Scalar
+title = $\Omega(w)$
+key = vbmm_pen
+ylabel = $\|x-\bar x\|^2$
+figurelocation = 4
+

@@ -3,7 +3,7 @@ import numpy as np
 from numpy import arange, conj, sqrt,median, abs as nabs, exp, maximum as nmax, angle, sum as nsum
 from numpy.fft import fftn, ifftn
 from numpy.linalg import norm
-from scipy.sparse import csr_matrix
+from scipy.sparse import csr_matrix, dia_matrix
 
 from py_utils.signal_utilities.ws import WS
 import py_utils.signal_utilities.sig_utils as su
@@ -122,6 +122,7 @@ class MSIST(Solver):
 
         if self.str_sparse_pen == 'l0rl2_group':
             tau = self.get_val('tau',True)
+            
             A = sf.create_section(self.ps_parameters,
                                   self.get_val('clusteraverage',False)) #cluster
             G = sf.create_section(self.ps_parameters,
@@ -133,7 +134,7 @@ class MSIST(Solver):
             
             #initialize non-overlapping space (list of ws objects ls_w_hat_n)
             ls_w_hat_n = [[w_n[ix_]*1 for j in dup_it] for ix_ in w_n_it]
-
+            
             #initialize non-overlapping space precision
             ls_S_hat_n = [((sum([w_n[ix].energy() for ix in w_n_it]) / g_i) 
                            + epsilon[0]**2).invert() for int_dup in dup_it]
@@ -155,13 +156,25 @@ class MSIST(Solver):
 
             #precompute AtA (doesn't change from one iteration to the next)
             AtA = (A.csr_avg.transpose()*A.csr_avg).tocsr()
+
+            #convert tau**2 to csr format to allow for subband-adaptive constraint
+            if tau.__class__.__name__ != 'ndarray':
+                tau_sq = np.ones(w_n[0].int_subbands) * tau**2    
+            else:
+                tau_sq = tau**2    
+            tau_sq_dia = [(w_n[0]*0+1)*tau_sq for j in dup_it]
+            tau_sq_dia = su.flatten_list(tau_sq_dia)
+            offsets = np.array([0])
+            tau_sz = tau_sq_dia.size
+            tau_sq_dia = dia_matrix((tau_sq_dia, offsets), shape=(tau_sz, tau_sz))
+
             
             #initialize S_hat_bar parameters for efficient matrix inverses
             Shatbar_p_filename=A.file_path.split('.pkl')[0]+'Shatbar.pkl'
             if not os.path.isfile(Shatbar_p_filename):
                 dict_in['col_offset']=A.int_size
                 S_hat_n_csr=su.flatten_list_to_csr(ls_S_hat_sup)
-                su.inv_block_diag((tau**2) * AtA + S_hat_n_csr, dict_in)
+                su.inv_block_diag((tau_sq_dia) * AtA + S_hat_n_csr, dict_in)
                 filehandler=open(Shatbar_p_filename, 'wb')
                 cPickle.dump(dict_in['dict_bdiag'],filehandler)
                 del S_hat_n_csr
@@ -184,7 +197,7 @@ class MSIST(Solver):
             dict_in['ws_dummy']=w_n[0]*0
             dict_in['g_i']=g_i
             
-            self.update_duplicates(dict_in,nu[0],epsilon[0],tau)    
+            self.update_duplicates(dict_in,nu[0],epsilon[0],tau_sq, tau_sq_dia)    
             
             w_bar_n=dict_in['w_bar_n'] 
             ls_w_hat_n=dict_in['ls_w_hat_n']
@@ -248,7 +261,7 @@ class MSIST(Solver):
             ###############################################
             if self.str_sparse_pen == 'l0rl2_group':
                 #S_hat_n, w_hat_n, and wb_bar (eqs 11, 19, and 13)
-                self.update_duplicates(dict_in, nu[n], epsilon[n], tau)    
+                self.update_duplicates(dict_in, nu[n], epsilon[n], tau_sq, tau_sq_dia)    
                 w_bar_n=dict_in['w_bar_n'] 
                 ls_w_hat_n=dict_in['ls_w_hat_n']
                 
@@ -362,7 +375,7 @@ class MSIST(Solver):
                         for ix_ in w_n_it:
                             w_n[ix_].set_subband(s,
                                             (alpha[s] * w_n[ix_].get_subband(s) + w_resid[ix_].get_subband(s) + 
-                                             (tau**2)*w_bar_n[ix_].get_subband(s)) / (alpha[s] + tau**2))
+                                             (tau_sq[s])*w_bar_n[ix_].get_subband(s)) / (alpha[s] + tau_sq[s]))
                     else: #a standard msist update for the lowpass coeffs
                         for ix_ in w_n_it:
                             w_n[ix_].set_subband(s, \
@@ -433,6 +446,8 @@ class MSIST(Solver):
             #update results
             self.results.update(dict_in)
             print 'Finished itn: n=' + str(n+1)
+            # if self.str_sparse_pen[:11] == 'l0rl2_group' and n==20:
+            #     self.str_sparse_pen = 'l0rl2'
         return dict_in
 
     def get_epsilon_nu(self):
@@ -462,7 +477,7 @@ class MSIST(Solver):
             raise Exception('no such continuation parameter rule')
         return epsilon,nu
 
-    def update_duplicates(self, dict_in, nu, epsilon, tau):
+    def update_duplicates(self, dict_in, nu, epsilon, tau_sq, tau_sq_dia):
         '''update the duplicate estimates in (the msist-g algorithm updates)
         ls_S_hat_n
         ls_w_hat_n
@@ -490,9 +505,9 @@ class MSIST(Solver):
         ls_S_hat_n=[ls_S_hat_sup[j].flatten()*(1.0/(ls_S_hat_n[j]+epsilon**2))
                     for j in dup_it] #eq 11
         S_hat_n_csr=su.flatten_list_to_csr(ls_S_hat_n)
-        ls_w_hat_n=[(~A)*(w_n[ix_]*(tau**2)) for ix_ in w_n_it] #eq 21
+        ls_w_hat_n=[(~A)*(w_n[ix_]*(tau_sq)) for ix_ in w_n_it] #eq 21
         w_n_hat_flat=[su.flatten_list(ls_w_hat_n[ix_]) for ix_ in w_n_it]
-        S_hat_bar_inv=su.inv_block_diag((tau**2) * AtA + (nu**2) * S_hat_n_csr, dict_in)
+        S_hat_bar_inv=su.inv_block_diag((tau_sq_dia) * AtA + (nu**2) * S_hat_n_csr, dict_in)
         w_n_hat_flat=[S_hat_bar_inv*w_n_hat_flat[ix_] for ix_ in w_n_it] #eq21 ctd
         ls_w_hat_n_unflat=[unflat_list(w_n_hat_flat[ix_],A.duplicates) for ix_ in w_n_it]
         #the +0 in the next line returns a new WS object...
