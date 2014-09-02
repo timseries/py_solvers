@@ -19,7 +19,7 @@ import os
 import cPickle
 
 import pdb
-                                                                                                                                                                         
+
 class MSIST(Solver):
     """
     Solver which performs the MSIST algorithm, with several different variants.
@@ -197,7 +197,7 @@ class MSIST(Solver):
             dict_in['ws_dummy']=w_n[0]*0
             dict_in['g_i']=g_i
             
-            self.update_duplicates(dict_in,nu[0],epsilon[0],tau_sq, tau_sq_dia)    
+            # self.update_duplicates(dict_in,nu[0],epsilon[0],tau_sq, tau_sq_dia)    
             
             w_bar_n=dict_in['w_bar_n'] 
             ls_w_hat_n=dict_in['ls_w_hat_n']
