@@ -170,7 +170,7 @@ class MSIST(Solver):
 
             
             #initialize S_hat_bar parameters for efficient matrix inverses
-            Shatbar_p_filename=A.file_path.split('.pkl')[0]+'Shatbar.pkl'
+            Shatbar_p_filename = A.file_path.split('.pkl')[0]+'Shatbar.pkl'
             if not os.path.isfile(Shatbar_p_filename):
                 dict_in['col_offset']=A.int_size
                 S_hat_n_csr=su.flatten_list_to_csr(ls_S_hat_sup)
@@ -436,14 +436,17 @@ class MSIST(Solver):
             if self.str_sparse_pen[:11] == 'l0rl2_group':
                 ls_w_hat_n = [[ls_w_hat_n[ix_][j] * ls_S_hat_sup[j] + 
                                w_n[ix_] * ((ls_S_hat_sup[j]+(-1))*(-1))
-                               for j in dup_it] for ix_ in w_n_it]
+                               for j in dup_it] for ix_ in w_n_it] #fill in the gaps with w_n
                 ls_w_hat_n = [[W*((~W)*w_hat_n) for w_hat_n in ls_w_hat_n[ix_]] 
                               for ix_ in w_n_it]
                 w_bar_n = [W*((~W)*w_bar_n[ix_]) for ix_ in w_n_it]
                 dict_in['w_bar_n'] = w_bar_n
                 dict_in['ls_w_hat_n'] = ls_w_hat_n
             dict_in['w_n'] = w_n
-            #update results
+
+            ################
+            #Update Results#
+            ################
             self.results.update(dict_in)
             print 'Finished itn: n=' + str(n+1)
             # if self.str_sparse_pen[:11] == 'l0rl2_group' and n==20:
