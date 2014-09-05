@@ -19,7 +19,7 @@ imszy = 168
 sz_x = imszx+gauss_szx-1
 sz_y = imszy+gauss_szy-1
 
-gauss_sigma = 2
+gauss_sigma = 1.5
 gauss_filter = gaussian((gauss_szx, gauss_szy),(gauss_sigma,gauss_sigma))
 
 x = np.arange(sz_x)/sz_x*periods_x*2.0*np.pi
@@ -30,8 +30,9 @@ x,y = np.mgrid[0:2.0 * np.pi * periods_x : 1 / sz_x * periods_x * 2.0 * np.pi,
 
 z = np.sin(x)*np.sin(y)
 
-max_phase = 5.0
+max_phase = 4.0
 min_phase = -1.0
+# min_phase = 0.0
 
 plt.imshow(z)
 plt.figure()
@@ -87,7 +88,7 @@ plt.imshow(log(nabs(zsmooth_fft))*circle)
 zsmooth_lpf_fft = zsmooth_fft*1 #don't need lpf anymore, but if we do uncomment the line above, and comment this on out
 
 zsmooth_lpf = np.real(ifftn(ifftshift(zsmooth_lpf_fft)))
-plt.imshow(zsmooth_lpf)
+plt.imshow(zsmooth_lpf, cmap='pink')
 plt.colorbar()
 
 plt.figure()
@@ -95,18 +96,27 @@ plt.imshow(log(abs(fftshift(fftn(zsmooth_lpf)))))
 plt.figure()
 # plt.imshow(log(abs(fftshift(fftn(zsmooth_lpf*mask)))))
 # plt.figure()
-plt.imshow(mask * zsmooth_lpf,cmap='gray')
+plt.imshow(mask * zsmooth_lpf,cmap='pink')
 plt.colorbar()
-signal = 1.0 * np.exp(1j * zsmooth_lpf)
+# signal = 1.0 * np.exp(1j * zsmooth_lpf)
 
 #simple phase unwrapping
-phase = angle(signal)
-phase[phase < min_phase] += 2.0 * np.pi
-phase[phase > max_phase] -= 2.0 * np.pi
+# phase = angle(signal)
+phase = mask * zsmooth_lpf
+# phase[phase < min_phase] += 2.0 * np.pi
+# phase[phase > max_phase] -= 2.0 * np.pi
 
-plt.imshow((phase))
+signal = (1.0-mask) * np.exp(1j * phase)
+
+plt.imshow(phase,cmap='pink')
 plt.colorbar()
 
+line_vel=phase[40,:]
+plt.plot(line_vel)
+plt.figure()
+plt.imshow(log(nabs(fftshift(fftn(phase)))))
+
+plt.imshow(np.abs(signal))
 np.savez_compressed('/home/tim/repos/py_solvers/application/data/velocity_imaging/2dsine_fully_sampled_data.npz',signal)
 
 np.savez_compressed('/home/tim/repos/py_solvers/application/data/velocity_imaging/2dsine_spatial_mask.npz',mask)

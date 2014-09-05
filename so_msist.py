@@ -122,7 +122,11 @@ class MSIST(Solver):
 
         if self.str_sparse_pen == 'l0rl2_group':
             tau = self.get_val('tau',True)
-            
+            tau_rate = self.get_val('taurate',True)
+            tau_start = self.get_val('taustart',True)
+            if np.all(tau_start != 0) and tau_rate != 0:
+                tau_end = tau
+                tau = tau_start
             A = sf.create_section(self.ps_parameters,
                                   self.get_val('clusteraverage',False)) #cluster
             G = sf.create_section(self.ps_parameters,
@@ -442,6 +446,9 @@ class MSIST(Solver):
                 w_bar_n = [W*((~W)*w_bar_n[ix_]) for ix_ in w_n_it]
                 dict_in['w_bar_n'] = w_bar_n
                 dict_in['ls_w_hat_n'] = ls_w_hat_n
+                if tau_rate != 0 and not np.any(tau > tau_end):
+                    tau_sq_dia = tau_rate * tau_sq_dia
+                    tau = np.sqrt(tau_rate) * tau
             dict_in['w_n'] = w_n
 
             ################
