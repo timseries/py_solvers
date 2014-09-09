@@ -410,6 +410,7 @@ class MSIST(Solver):
                                               dict_in['ls_local_lim_secs'])
                     if self.get_val('iterationmask',True): #apply boundary conditions for phase encoded velocity 
                         theta_n *= dict_in['mask']
+                        # m_n *= dict_in['mask'] #uncomment this for 'total' masking
                     x_n = m_n * exp(1j*theta_n)
                 dict_in['theta_n'] = theta_n
                 dict_in['magnitude_n'] = m_n
