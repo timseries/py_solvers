@@ -6,7 +6,7 @@ mag = np.zeros(imsize)
 
 vess1_rad=20
 vess1_loc=np.array([40,40])
-vess1_max_phase=4
+vess1_max_phase=6
 
 vess2_rad=30
 vess2_loc=np.array([80,80])
