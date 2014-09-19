@@ -88,8 +88,15 @@ class MSIST(Solver):
         #initialize current solution in sparse domain
         #g_i is the element group size (2 for CWT, 4 for CWT and input_complex)
         if self.input_complex:
-            dict_in['theta_n'] = angle(x_n)
+            if self.input_phase_encoded:
+                theta_n = su.phase_unwrap(angle(x_n),
+                                          dict_in['dict_global_lims'],
+                                          dict_in['ls_local_lim_secs'])
+            else:
+                theta_n = angle(x_n)
+            dict_in['theta_n'] = theta_n
             dict_in['magnitude_n'] = nabs(x_n)
+
             w_n = [W * x_n.real, W * x_n.imag]
             g_i = 2 * (w_n[0].is_wavelet_complex() + 1)
         else:
