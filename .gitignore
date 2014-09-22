@@ -5,6 +5,7 @@
 
 #big data matrices
 *64,64,64*
+*128,256,128*
 
 # C extensions
 *.so
