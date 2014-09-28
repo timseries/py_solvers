@@ -12,15 +12,22 @@ from matplotlib import pyplot as plt
 
 def main():
     #configuration specification, absolute path
+    seed_flag = -1
     if len(sys.argv)>1:
         ps_path=sys.argv[1]
+        if len(sys.argv)>2:
+            seed_flag = sys.argv[2]
     else:    
         ps_path='/home/tim/repos/py_solvers/applications/deconvolution/config/downsampled_cameraman_vbmm.ini'
     ps_params = ParameterStruct(ps_path)
+    if seed_flag!=-1:
+        #set the seed of sec_observe to the commandline arg
+        ps_params.set_key_val_pairs('Observe1', ['seed'], [seed_flag])
     dict_in = {}
     sec_input = sf.create_section(ps_params,'Input1')
     sec_preprocess = sf.create_section(ps_params,'Preprocess1')
     sec_observe = sf.create_section(ps_params,'Observe1')
+        
     so_solver = sf.create_section(ps_params,'Solver1')
 
     #read, observe, solve, report

@@ -446,12 +446,12 @@ class MSIST(Solver):
                 w_n = [W * x_n]
 
             if self.str_sparse_pen[:11] == 'l0rl2_group':
+                w_bar_n = [W*((~W)*w_bar_n[ix_]) for ix_ in w_n_it]
                 ls_w_hat_n = [[ls_w_hat_n[ix_][j] * ls_S_hat_sup[j] + 
-                               w_n[ix_] * ((ls_S_hat_sup[j]+(-1))*(-1))
+                               w_bar_n[ix_] * ((ls_S_hat_sup[j]+(-1))*(-1))
                                for j in dup_it] for ix_ in w_n_it] #fill in the gaps with w_n
                 ls_w_hat_n = [[W*((~W)*w_hat_n) for w_hat_n in ls_w_hat_n[ix_]] 
                               for ix_ in w_n_it]
-                w_bar_n = [W*((~W)*w_bar_n[ix_]) for ix_ in w_n_it]
                 dict_in['w_bar_n'] = w_bar_n
                 dict_in['ls_w_hat_n'] = ls_w_hat_n
                 if tau_rate != 0 and not np.any(tau > tau_end):
