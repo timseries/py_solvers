@@ -9,6 +9,7 @@ from py_utils.helpers import convertStr
 from py_utils.section_factory import SectionFactory as sf 
 
 from matplotlib import pyplot as plt
+import time
 
 def main():
     #configuration specification, absolute path
@@ -27,16 +28,17 @@ def main():
     sec_input = sf.create_section(ps_params,'Input1')
     sec_preprocess = sf.create_section(ps_params,'Preprocess1')
     sec_observe = sf.create_section(ps_params,'Observe1')
-        
     so_solver = sf.create_section(ps_params,'Solver1')
 
     #read, observe, solve, report
     sec_input.read(dict_in)
     sec_preprocess.preprocess(dict_in)
     sec_observe.observe(dict_in)
+    t0 = time.time()    
     so_solver.solve(dict_in)
+    t1 = time.time()
     so_solver.results.display()
     so_solver.results.save()
-
+    print "Solver finished in " + str(t1-t0) + " seconds"
 if __name__ == "__main__":
     main()

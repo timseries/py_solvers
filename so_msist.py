@@ -45,6 +45,10 @@ class MSIST(Solver):
         self.input_complex = None
         self.input_phase_encoded = self.get_val('phaseencoded',True) #cplx
         self.input_poisson_corrupted = self.get_val('poissoncorrupted',True) #cplx
+        self.convexnu = self.get_val('convexnu',True) #if we have a constrained cont rule for nu
+        self.ordepsilon = self.get_val('ordepsilon',True)
+        self.ordepsilonpercstop = self.get_val('ordepsilonpercstop',True)
+        self.ordepsilonpercstart = self.get_val('ordepsilonpercstart',True)
                 
     def solve(self,dict_in):
         """
@@ -57,13 +61,15 @@ class MSIST(Solver):
         ### Transforms and Modalities ####
         ##################################
         H = self.H #mapping from solution domain to observation domain
+        dict_in['H'] = H
         W = self.W #sparsifying transform
+        dict_in['W'] = W
 
         if self.alpha.__class__.__name__ != 'ndarray':
             self.alpha = su.spectral_radius(self.W, self.H, dict_in['x_0'].shape,
                                             self.get_val('alphamethod', False, 'spectrum'))
-        alpha = self.alpha #Lambda_alpha main diagonal
-        
+        alpha = self.alpha #Lambda_alpha main diagonal (B-sized vector of subband gains)
+        dict_in['alpha'] = alpha
         ############
         #Input Data#
         ############
@@ -108,11 +114,26 @@ class MSIST(Solver):
         
         #initialize the precision matrix with zeros
         S_n = w_n[0]*0 
-        
+        dict_in['S_n'] = S_n
         #initialize continuation parameters
         epsilon,nu = self.get_epsilon_nu()
-        dict_in['nu_sq'] = nu**2
-        dict_in['epsilon_sq'] = epsilon**2
+        if self.ordepsilon:
+            # self.ordepsilonpercstart = 8.0/9.0*(.55**2)
+            epsilon = np.zeros(self.int_iterations+1,)
+            self.percentiles = np.arange(30,self.ordepsilonpercstop,-1.0/self.int_iterations)
+            epsilon[0] = self.get_ord_epsilon(w_n[0],np.inf, self.percentiles[0])
+            dict_in['epsilon_sq'] = epsilon[0]**2
+        else:            
+            dict_in['epsilon_sq'] = epsilon**2
+        if self.convexnu:
+            nu = np.zeros(self.int_iterations+1,)
+            nu[0] = self.get_convex_nu(w_n[0], 
+                                       epsilon[0]**2, 
+                                       np.min(alpha))
+            dict_in['nu_sq'] =  nu[0]**2
+        else:
+            dict_in['nu_sq'] = nu**2
+            
 
         #wavelet domain variance used for poisson deblurring
         ary_p_var=0 
@@ -250,7 +271,6 @@ class MSIST(Solver):
         print 'Finished itn: n=' + str(0)
         #begin iterations here for the MSIST(-X) algorithm
         for n in np.arange(self.int_iterations):
-
             ####################
             ###Landweber Step###
             ####################
@@ -266,6 +286,21 @@ class MSIST(Solver):
                 w_resid = [W * (HtHf).real, W * (HtHf).imag]
             else:
                 w_resid = [W * ((~H) * f_resid)]
+                
+            ####################
+            ######Convex Nu#####
+            #####Ord Epsilon####
+            ####################
+            if self.ordepsilon:
+                if n==0:
+                    prevepsilon = epsilon[0]
+                else:
+                    prevepsilon = epsilon[n-1]
+                epsilon[n] = self.get_ord_epsilon(w_n[0], prevepsilon, self.percentiles[n])
+                dict_in['epsilon_sq'] = epsilon[n] ** 2
+            if self.convexnu:
+                nu[n] = self.get_convex_nu(w_n[0], epsilon[n]**2, np.min(self.alpha))
+                dict_in['nu_sq'] = nu[n] ** 2
                 
             ###############################################
             ###Sparse Penalty-Specific Thresholding Step###
@@ -458,7 +493,7 @@ class MSIST(Solver):
                     tau_sq_dia = tau_rate * tau_sq_dia
                     tau = np.sqrt(tau_rate) * tau
             dict_in['w_n'] = w_n
-
+            dict_in['S_n'] = S_n
             ################
             #Update Results#
             ################
@@ -480,17 +515,17 @@ class MSIST(Solver):
         nu_stop = self.get_val('nustop', True)
         if str_method == 'geometric':
             epsilon = np.asarray([nmax(epsilon_start * (decay ** i),epsilon_stop) \
-                                  for i in arange(self.int_iterations)])
+                                  for i in arange(self.int_iterations+1)])
             nu = np.asarray([nmax(nu_start * (decay ** i),nu_stop) \
-                                  for i in arange(self.int_iterations)])
+                                  for i in arange(self.int_iterations+1)])
         elif str_method == 'exponential':
             epsilon = np.asarray([epsilon_start * exp(-i / decay) + epsilon_stop \
-                                  for i in arange(self.int_iterations)])
+                                  for i in arange(self.int_iterations+1)])
             nu = np.asarray([nu_start * exp(-i / decay) + nu_stop \
-                                  for i in arange(self.int_iterations)])
+                                  for i in arange(self.int_iterations+1)])
         elif str_method == 'fixed':
-            epsilon = epsilon_start*np.ones(self.int_iterations,)
-            nu = nu_start*np.ones(self.int_iterations,)
+            epsilon = epsilon_start*np.ones(self.int_iterations+1,)
+            nu = nu_start*np.ones(self.int_iterations+1,)
         else:
             raise Exception('no such continuation parameter rule')
         return epsilon,nu
@@ -590,8 +625,21 @@ class MSIST(Solver):
             ary_a[s+4] = fit_nu / 2
         print ary_a    
         return ary_a    
-
-
+    
+    def get_convex_nu(self, w_n, epsilon_sq, alpha_min):
+        rhsmin = w_n.energy().flatten()
+        rhsmin = rhsmin + 4*epsilon_sq + 4*epsilon_sq**2/rhsmin 
+        rhsmin = np.min(rhsmin)
+        lhsmin = alpha_min
+        # lhsmin = 1
+        return np.sqrt(1.0/8*lhsmin*rhsmin)
+    
+    def get_ord_epsilon(self,w_n,epsilon,percetile_n):
+        coeffs = w_n.energy().flatten()
+        print percetile_n
+        print np.sqrt(np.percentile(coeffs,percetile_n))
+        return min(epsilon,np.sqrt(np.percentile(coeffs,percetile_n)))
+        
     class Factory:
         def create(self,ps_params,str_section):
             return MSIST(ps_params,str_section)
