@@ -64,6 +64,9 @@ class MSIST(Solver):
         dict_in['H'] = H
         W = self.W #sparsifying transform
         dict_in['W'] = W
+        # precision = 'float32'
+        # if W.output_dtype!='':
+        #     precision = W.output_dtype
 
         if self.alpha.__class__.__name__ != 'ndarray':
             self.alpha = su.spectral_radius(self.W, self.H, dict_in['x_0'].shape,
@@ -194,7 +197,8 @@ class MSIST(Solver):
                 tau_sq = np.ones(w_n[0].int_subbands) * tau**2    
             else:
                 tau_sq = tau**2    
-            tau_sq_dia = [(w_n[0]*0+1)*tau_sq for j in dup_it]
+            # tau_sq_dia = [((w_n[0]*0+1).cast('float16'))*tau_sq for j in dup_it]
+            tau_sq_dia = [((w_n[0]*0+1))*tau_sq for j in dup_it]
             tau_sq_dia = su.flatten_list(tau_sq_dia)
             offsets = np.array([0])
             tau_sz = tau_sq_dia.size
