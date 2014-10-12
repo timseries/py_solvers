@@ -188,7 +188,8 @@ class MSIST(Solver):
             #load this vector into each new wavelet subband object
             ls_S_hat_sup = [(w_n[0]*0).unflatten(S_sup) for S_sup in ls_S_hat_sup]
             ls_S_hat_sup = [S_hat_n_sup.nonzero() for S_hat_n_sup in ls_S_hat_sup]
-
+            del S_sup
+            del S_hat_n_sup
             #precompute AtA (doesn't change from one iteration to the next)
             AtA = (A.csr_avg.transpose()*A.csr_avg).tocsr()
 
@@ -197,8 +198,8 @@ class MSIST(Solver):
                 tau_sq = np.ones(w_n[0].int_subbands) * tau**2    
             else:
                 tau_sq = tau**2    
-            # tau_sq_dia = [((w_n[0]*0+1).cast('float16'))*tau_sq for j in dup_it]
-            tau_sq_dia = [((w_n[0]*0+1))*tau_sq for j in dup_it]
+            tau_sq_dia = [((w_n[0]*0+1).cast(A.dtype))*tau_sq for j in dup_it]
+            # tau_sq_dia = [((w_n[0]*0+1))*tau_sq for j in dup_it]
             tau_sq_dia = su.flatten_list(tau_sq_dia)
             offsets = np.array([0])
             tau_sz = tau_sq_dia.size
