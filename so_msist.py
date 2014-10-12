@@ -213,7 +213,7 @@ class MSIST(Solver):
                 S_hat_n_csr=su.flatten_list_to_csr(ls_S_hat_sup)
                 su.inv_block_diag((tau_sq_dia) * AtA + S_hat_n_csr, dict_in)
                 filehandler=open(Shatbar_p_filename, 'wb')
-                cPickle.dump(dict_in['dict_bdiag'],filehandler)
+                cPickle.dump(dict_in['dict_bdiag'],filehandler,-1)
                 del S_hat_n_csr
             else:    
                 filehandler=open(Shatbar_p_filename, 'rb')
