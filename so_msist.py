@@ -71,6 +71,8 @@ class MSIST(Solver):
         if self.alpha.__class__.__name__ != 'ndarray':
             self.alpha = su.spectral_radius(self.W, self.H, dict_in['x_0'].shape,
                                             self.get_val('alphamethod', False, 'spectrum'))
+            # self.alpha = su.spectral_radius(self.W, self.H, (64,64,64),
+            #                                 self.get_val('alphamethod', False, 'spectrum'))            
         alpha = self.alpha #Lambda_alpha main diagonal (B-sized vector of subband gains)
         dict_in['alpha'] = alpha
         ############
