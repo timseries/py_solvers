@@ -507,7 +507,7 @@ class MSIST(Solver):
             ################
             self.results.update(dict_in)
             print 'Finished itn: n=' + str(n+1)
-            # if self.str_sparse_pen[:11] == 'l0rl2_group' and n==20:
+            # if self.str_sparse_pen[:11] == 'l0rl2_group' and n==150: #an interesting experiment for cs..
             #     self.str_sparse_pen = 'l0rl2'
         return dict_in
 
