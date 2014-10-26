@@ -5,6 +5,7 @@ from numpy import abs as nabs, log
 from numpy.fft import fftn, fftshift
 from mpldatacursor import datacursor
 from py_utils.signal_utilities.sig_utils import gaussian
+from numpy.random import normal, rand, seed, poisson
 from scipy.signal import convolve, firwin
 
 #2d sinusoid, filtered noise parameters, and phase scaling
@@ -41,6 +42,7 @@ plt.imshow(log(abs(zfft)))
 datacursor(display='single')
 #start with 
 # z=0
+seed(0)
 gauss_random = np.random.rand(int(sz_x),int(sz_y))
 gauss_random = gauss_random / np.max(np.abs(gauss_random))
 z += gauss_random
@@ -106,7 +108,7 @@ phase = mask * zsmooth_lpf
 # phase[phase < min_phase] += 2.0 * np.pi
 # phase[phase > max_phase] -= 2.0 * np.pi
 
-signal = (1.0-mask) * np.exp(1j * phase)
+signal = mask*np.exp(1j * (phase))
 
 plt.imshow(phase,cmap='pink')
 plt.colorbar()
