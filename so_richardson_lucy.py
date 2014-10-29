@@ -47,6 +47,7 @@ class RichardsonLucy(Solver):
         gamma = (~H)*np.ones(dict_in['y'].shape)
         #begin iterations here
         self.results.update(dict_in)
+        print 'Finished itn: n=' + str(0)
         for n in np.arange(self.int_iterations):
             #save current iterate
             div=dict_in['y']/(H*x_n+b)
@@ -57,6 +58,7 @@ class RichardsonLucy(Solver):
             x_n=su.pad_center(x_n,dict_in['x_0'].shape)
             #update results
             self.results.update(dict_in)
+            print 'Finished itn: n=' + str(n+1)
         return dict_in
 
     class Factory:
