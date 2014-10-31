@@ -9,7 +9,7 @@ from mpldatacursor import datacursor
 data_path ='/home/tim/repos/py_solvers/application/data/velocity_imaging/velimg1.npz'
 data = np.load(data_path)['arr_0']
 conjprod = 1
-frame_order='forward'
+frame_order='reverse'
 frame_order = [0, 1]
 extrafftshift=1
 for frame in xrange(2):
@@ -59,7 +59,7 @@ for fixmaskel in fixmask:
     
 #save boundary spatialmask
 # np.savez_compressed('/home/tim/repos/py_solvers/application/data/velocity_imaging/2dsine_spatial_spatialmask_boundary.npz',boundary_spatialmask*spatialmask)
-spatialmask_path= '/home/tim/repos/py_solvers/application/data/velocity_imaging/velimg1_spatial_spatialmask.npz'
+spatialmask_path= '/home/tim/repos/py_solvers/application/data/velocity_imaging/velimg1_spatial_mask.npz'
 np.savez_compressed(spatialmask_path,spatialmask)
 
 spatialmask=np.load(spatialmask_path)['arr_0']
