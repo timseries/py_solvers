@@ -43,6 +43,8 @@ class RichardsonLucy(Solver):
         x_n = dict_in['x_0'].copy()
         b = dict_in['b']#background
         sigma_sq = dict_in['noisevariance']
+        #dummy multiply to intialize H
+        H*x_n
         dict_in['x_n'] = su.crop_center(x_n,dict_in['y'].shape)
         gamma = (~H)*np.ones(dict_in['y'].shape)
         #begin iterations here
