@@ -45,7 +45,7 @@ class MSIST(Solver):
         self.input_complex = None
         self.input_phase_encoded = self.get_val('phaseencoded',True) #cplx
         self.input_poisson_corrupted = self.get_val('poissoncorrupted',True) 
-        self.sc_factor = self.get_val('scfactor',True) 
+        self.sc_factor = self.get_val('scfactor',True,default_value=1) 
         self.convexnu = self.get_val('convexnu',True) #if we have a constrained cont rule for nu
         self.ordepsilon = self.get_val('ordepsilon',True)
         self.ordepsilonpercstop = self.get_val('ordepsilonpercstop',True)
