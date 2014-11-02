@@ -422,7 +422,7 @@ class MSIST(Solver):
                     else:
                         int_lev, int_ori = w_n[0].lev_ori_from_subband(s)
                         ary_p_var = w_y_scaling_coeffs[int_lev]
-                        ary_p_var[ary_p_var<=0]=.01
+                        ary_p_var[ary_p_var<=0]=0
                 if (self.str_sparse_pen == 'l0rl2_group'):
                     if s>0:
                         for ix_ in w_n_it:
@@ -438,7 +438,7 @@ class MSIST(Solver):
                     for ix_ in w_n_it:
                         w_n[ix_].set_subband(s, 
                                            (alpha[s] * w_n[ix_].get_subband(s) + w_resid[ix_].get_subband(s)) / 
-                                           (alpha[s] + (nu[n]**2+ary_p_var) * S_n.get_subband(s)))
+                                           (alpha[s] + (nu[n]**2+.5*ary_p_var) * S_n.get_subband(s)))
                 #end updating subbands   
                 
             #############################################    
