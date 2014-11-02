@@ -44,7 +44,8 @@ class MSIST(Solver):
         self.spatial_threshold = self.get_val('spatialthreshold',True) #msistp
         self.input_complex = None
         self.input_phase_encoded = self.get_val('phaseencoded',True) #cplx
-        self.input_poisson_corrupted = self.get_val('poissoncorrupted',True) #cplx
+        self.input_poisson_corrupted = self.get_val('poissoncorrupted',True) 
+        self.sc_factor = self.get_val('scfactor',True) 
         self.convexnu = self.get_val('convexnu',True) #if we have a constrained cont rule for nu
         self.ordepsilon = self.get_val('ordepsilon',True)
         self.ordepsilonpercstop = self.get_val('ordepsilonpercstop',True)
@@ -438,7 +439,7 @@ class MSIST(Solver):
                     for ix_ in w_n_it:
                         w_n[ix_].set_subband(s, 
                                            (alpha[s] * w_n[ix_].get_subband(s) + w_resid[ix_].get_subband(s)) / 
-                                           (alpha[s] + (nu[n]**2+.5*ary_p_var) * S_n.get_subband(s)))
+                                           (alpha[s] + (nu[n]**2+self.sc_factor*ary_p_var) * S_n.get_subband(s)))
                 #end updating subbands   
                 
             #############################################    
