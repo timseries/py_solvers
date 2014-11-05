@@ -472,7 +472,7 @@ class MSIST(Solver):
             if H.str_object_name=='Blur' and H.lgc_even_fft:
                 x_n=su.crop_center(x_n,dict_in['y'].shape)
             if self.input_poisson_corrupted and self.spatial_threshold:
-                x_n[x_n<b]=0.0
+                x_n[x_n<0]=0.0
 
             #finished spatial domain operations on this iteration, store
             dict_in['x_n'] = x_n
