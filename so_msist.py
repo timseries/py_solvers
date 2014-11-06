@@ -42,6 +42,7 @@ class MSIST(Solver):
             self.W = self.W.ls_ops[0] 
         self.alpha = self.get_val('alpha',True)
         self.spatial_threshold = self.get_val('spatialthreshold',True) #msistp
+        self.spatial_threshold_val = self.get_val('spatialthresholdval',True) #msistp
         self.input_complex = None
         self.input_phase_encoded = self.get_val('phaseencoded',True) #cplx
         self.input_poisson_corrupted = self.get_val('poissoncorrupted',True) 
@@ -472,7 +473,7 @@ class MSIST(Solver):
             if H.str_object_name=='Blur' and H.lgc_even_fft:
                 x_n=su.crop_center(x_n,dict_in['y'].shape)
             if self.input_poisson_corrupted and self.spatial_threshold:
-                x_n[x_n<0]=0.0
+                x_n[x_n<self.spatial_threshold_val]=0.0
 
             #finished spatial domain operations on this iteration, store
             dict_in['x_n'] = x_n
