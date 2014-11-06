@@ -49,6 +49,7 @@ class MSIST(Solver):
         self.sc_factor = self.get_val('scfactor',True,default_value=1) 
         self.convexnu = self.get_val('convexnu',True) #if we have a constrained cont rule for nu
         self.ordepsilon = self.get_val('ordepsilon',True)
+        self.hmt = self.get_val('hmt',True)
         self.ordepsilonpercstop = self.get_val('ordepsilonpercstop',True)
         self.ordepsilonpercstart = self.get_val('ordepsilonpercstart',True)
                 
@@ -296,17 +297,17 @@ class MSIST(Solver):
             else:
                 w_resid = [W * ((~H) * f_resid)]
                 
-            ####################
-            ######Convex Nu#####
-            #####Ord Epsilon####
-            ####################
+            ########################
+            ######Convex Nu#########
+            #####Ord/HMT Epsilon####
+            ########################
             if self.ordepsilon:
                 if n==0:
                     prevepsilon = epsilon[0]
                 else:
                     prevepsilon = epsilon[n-1]
                 epsilon[n] = self.get_ord_epsilon(w_n[0], prevepsilon, self.percentiles[n])
-                dict_in['epsilon_sq'] = epsilon[n] ** 2
+                dict_in['epsilon_sq'] = epsilon[n] ** 2                
             if self.convexnu:
                 nu[n] = self.get_convex_nu(w_n[0], epsilon[n]**2, np.min(self.alpha))
                 dict_in['nu_sq'] = nu[n] ** 2
@@ -330,8 +331,26 @@ class MSIST(Solver):
                                 axis=0) / g_i  + epsilon[n]**2
                     S0_n = 1.0 / S0_n
                 else:    
-                    S_n = (sum([w_n[ix_].energy() for ix_ in w_n_it]) / g_i
-                           + epsilon[n]**2).invert()
+                    if self.hmt:
+                        S_n_prev = S_n*1.0                        
+                        S_n.set_subband(0,(1.0 / 
+                                           ((1.0 / g_i) *  
+                                            nabs(w_n[0].get_subband(0))**2 + (epsilon[n]**2))))
+
+                        for s in xrange(w_n[0].int_subbands-1,0,-1):
+                            sigma_sq_parent_us = nabs(w_n[0].get_upsampled_parent(s))**2
+                                # epsilon_parent_sq = (2.0**(-1.25))*(1.0/g_i*sigma_sq_parent_us + epsilon[n]**2)
+                                # s_parent_sq = 1.0/((2.0**(-2.25))*(1.0/g_i*sigma_sq_parent_us + epsilon[n]**2))
+                            s_parent_sq = 1.0/((2.0**(-2.25))*(1.0/g_i*sigma_sq_parent_us))
+                            # s_parent_sq = (2.0**(2.25))*S_n_prev.get_upsampled_parent(s)
+                                # S_n.set_subband(s,(1.0 / 
+                                #                    ((1.0 / g_i) *  
+                                #                     nabs(w_n[0].get_subband(s))**2 + (epsilon_parent_sq))))
+                            S_n.set_subband(s,s_parent_sq)                               
+                                
+                    else:
+                        S_n = (sum([w_n[ix_].energy() for ix_ in w_n_it]) / g_i
+                               + epsilon[n]**2).invert()
             elif (self.str_sparse_pen[0:5] == 'vbmm' and 
                   self.str_sparse_pen[-5:] != 'hmt'): 
                 cplx_norm = 1.0 + self.input_complex
@@ -372,7 +391,6 @@ class MSIST(Solver):
                             sigma_n = 0
                         else:
                             sigma_n = (1.0 / nu[n]**2 * alpha[s] + S_n.get_subband(s))**(-1)
-                        # if s < w_n.int_subbands - w_n.int_orientations and s > 0:    
                         if s > 0:    
                             w_parent_us = w_n[0].get_upsampled_parent(s)
                             alpha_dec = 2.25
@@ -387,25 +405,10 @@ class MSIST(Solver):
                             else:
                                 ap = .5
                             w_en_avg = w_n[0].subband_group_sum(s,'parent_children')
-                            # S_n.set_subband(s, (g_i + 2.0 *  ary_a[s]) / 
-                            #                 (nabs(w_n.get_subband(s))**2 + sigma_n + 
-                            #                  2.0 * b_n.get_subband(s)))
-                            #the standard vbmm b with estimated shape parameter,works with the parent+4 children b
                             S_n.set_subband(s, (g_i + 2.0 *  ary_a[s]) / 
                                             (nabs(w_n[0].get_subband(s))**2 + sigma_n + 
                                              2.0 * b_n.get_subband(s)))
-                            #the vbmm hmt model for s,b, ngk
-                            # S_n.set_subband(s, (g_i + 2.0 * ap + ary_a[s]) / 
-                            #                 (nabs(w_n.get_subband(s))**2 + sigma_n + 
-                            #                  2.0 * ((2**(-alpha_dec))*b_child + b_n.get_subband(s))))
-                            # the parent+4 children bs
                             b_n.set_subband(s,ary_a[s] * w_en_avg)
-                            #the vbmm hmt model for s,b, ngk
-                            # b_n.set_subband(s,(4*ary_a[s]+ap) /
-                            #                 (s_child + 2**(-alpha_dec) * S_n.get_subband(s)))
-                            #other b estimators
-                            # b_n.set_subband(s,ary_a[s] * 1/2.0*(nabs(w_n.get_subband(s))**2+np.abs(w_parent_us)**2))
-                            # b_n.set_subband(s,ary_a[s] *  (2**(-alpha_dec)) * (np.abs(w_parent_us)**2))
                         else: #no parents, so generate fixed-param gammas
                             S_n.set_subband(s, (g_i + 2.0 * ary_a[s]) / 
                                             (nabs(w_n[0].get_subband(s))**2 + sigma_n +
