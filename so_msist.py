@@ -141,7 +141,6 @@ class MSIST(Solver):
             dict_in['nu_sq'] =  nu[0]**2
         else:
             dict_in['nu_sq'] = nu**2
-            
 
         #wavelet domain variance used for poisson deblurring
         ary_p_var=0 
