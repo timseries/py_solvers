@@ -8,6 +8,7 @@ import numpy as np
 from py_utils.parameter_struct import ParameterStruct
 from py_utils.helpers import convertStr
 from py_utils.section_factory import SectionFactory as sf 
+from py_utils.signal_utilities.sig_utils import pretty2
 
 from matplotlib import pyplot as plt
 import time
@@ -47,5 +48,7 @@ def main():
         so_solver.results.display()
         so_solver.results.save()
         print "Solver finished in " + str(t1-t0) + " seconds"
+        if 'profiling' in dict_in:
+            pretty2(dict_in['profiling'])
 if __name__ == "__main__":
     main()

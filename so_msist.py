@@ -17,6 +17,7 @@ import scipy.stats as ss
 
 import os
 import cPickle
+import time
 
 import pdb
 
@@ -273,29 +274,40 @@ class MSIST(Solver):
             dict_in['x_n']=su.crop_center(x_n,dict_in['y'].shape)
             w_y_scaling_coeffs=w_y.downsample_scaling()
 
+        self.results.update(dict_in)
+        print 'Finished itn: n=' + str(0)
+        #begin iterations here for the MSIST(-X) algorithm, add some profiling info here
+        dict_profile={}
+        dict_profile['twoft_time']=[]
+        dict_profile['wht_time']=[]
+        dict_profile['other_time']=[]
+        dict_profile['reproj_time_inv']=[]
+        dict_profile['reproj_time_for']=[]
+        dict_in['profiling']=dict_profile
+        t0=time.time()
         ####################
         ##Begin Iterations##
         ####################
-        self.results.update(dict_in)
-        print 'Finished itn: n=' + str(0)
-        #begin iterations here for the MSIST(-X) algorithm
         for n in np.arange(self.int_iterations):
             ####################
             ###Landweber Step###
             ####################
+            twoft_0=time.time()
             H.set_output_fourier(True) #force Fourier output to reduce ffts
             if self.input_complex:
                 f_resid = y_hat - H * x_n #Landweber difference
             else:    
                 f_resid = ifftn(y_hat - H * x_n)
                 H.set_output_fourier(False)
-
+            twoft_1=time.time()
             if self.input_complex:
                 HtHf = (~H) * f_resid 
                 w_resid = [W * (HtHf).real, W * (HtHf).imag]
             else:
                 w_resid = [W * ((~H) * f_resid)]
-                
+            wht=time.time()
+            dict_profile['twoft_time'].append(twoft_1-twoft_0)
+            dict_profile['wht_time'].append(wht-twoft_1)
             ########################
             ######Convex Nu#########
             #####Ord/HMT Epsilon####
@@ -448,7 +460,7 @@ class MSIST(Solver):
             #############################################    
             ##Solution Domain Projection and Operations##
             #############################################    
-
+            tother = time.time()            
             if self.input_complex:
                 x_n = np.asfarray(~W * w_n[0],'complex128') 
                 x_n += 1j*np.asfarray(~W * w_n[1],'complex128')
@@ -470,7 +482,7 @@ class MSIST(Solver):
                 dict_in['magnitude_n'] = m_n
             else:    
                 x_n = ~W * w_n[0]
-                
+            tinvdwt = time.time()                
             #implicit convolution operator is used, so crop and repad
             if H.str_object_name=='Blur' and H.lgc_even_fft:
                 x_n=su.crop_center(x_n,dict_in['y'].shape)
@@ -486,12 +498,14 @@ class MSIST(Solver):
             #############################
             #Wavelet Domain Reprojection#
             #############################
-
+            dict_profile['other_time'].append(tother-wht) 
             if self.input_complex:
                 w_n = [W * x_n.real, W * x_n.imag]
             else:
                 w_n = [W * x_n]
-
+            tforwardwt = time.time()                
+            dict_profile['reproj_time_inv'].append(tinvdwt-tother) 
+            dict_profile['reproj_time_for'].append(tforwardwt-tinvdwt) 
             if self.str_sparse_pen[:11] == 'l0rl2_group':
                 ls_w_hat_n = [[ls_w_hat_n[ix_][j] * ls_S_hat_sup[j] + 
                                w_bar_n[ix_] * ((ls_S_hat_sup[j]+(-1))*(-1))

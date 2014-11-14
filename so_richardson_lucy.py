@@ -16,6 +16,7 @@ from py_utils.signal_utilities.sig_utils import crop_center
 #profiling and debugging stuff
 from py_utils.timer import Timer
 import pdb
+import time
 
 class RichardsonLucy(Solver):
     """
@@ -50,11 +51,26 @@ class RichardsonLucy(Solver):
         #begin iterations here
         self.results.update(dict_in)
         print 'Finished itn: n=' + str(0)
+        dict_profile={}
+        dict_profile['twoft_time']=[]
+        dict_profile['other_time']=[]
+        dict_profile['ht_time']=[]
+        dict_in['profiling']=dict_profile
         for n in np.arange(self.int_iterations):
             #save current iterate
-            div=dict_in['y']/(H*x_n+b)
-            div[div==np.nan]=0.0
+            twoft_0=time.time()
+            div=(H*x_n+b)
+            twoft_1=time.time()
+            dict_profile['twoft_time'].append(twoft_1-twoft_0)            
+            other_time_0=time.time()
+            div = dict_in['y']/div
+            div[div==np.nan]=0.0    
+            other_time_1=time.time()
+            dict_profile['other_time'].append(other_time_1-other_time_0)
+            twoft_2=time.time()
             x_n = ((~H) * div) * x_n / gamma
+            twoft_3=time.time()
+            dict_profile['ht_time'].append(twoft_3-twoft_2)
             x_n=su.crop_center(x_n,dict_in['y'].shape)
             dict_in['x_n'] = x_n
             x_n=su.pad_center(x_n,dict_in['x_0'].shape)
