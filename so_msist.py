@@ -1,33 +1,77 @@
 #!/usr/bin/python -tt
+r"""This module implements the MSIST solver class component of 
+the py_solvers package.
+
+The following mathematical definitions apply throughout:
+:math:`\mathbf{Lambda}_{\alpha}`: The diagonal matrix of subband gain parameters.
+:math:`\epsilon^2`: Continuation parameter which controls the convexity 
+    of the penalty surface.
+:math:`\nu^2`: Continuation parameter which controls the sparse regularization.
+:math:`\tau^2`: Cluster fidelity parameter (matrix) for MSIST-G and MSIST-C+G.
+:math:`\mathbf{T}`: Cluster fidelity matrix for MSIST-G and MSIST-C+G.
+:math:`\mathbf{A}`: Cluster averaging matrix.
+:math:`\mathbf{G}`: Group energy averaging matrix.
+
+"""
+
 import numpy as np
-from numpy import arange, conj, sqrt,median, abs as nabs, exp, maximum as nmax, angle, sum as nsum
+from numpy import arange, conj, sqrt, median, abs as nabs, exp, maximum as nmax, angle, sum as nsum
 from numpy.fft import fftn, ifftn
 from numpy.linalg import norm
 from scipy.sparse import csr_matrix, dia_matrix
-
-from py_utils.signal_utilities.ws import WS
-import py_utils.signal_utilities.sig_utils as su
-from py_utils.signal_utilities.sig_utils import unflatten_list as unflat_list
-from py_solvers.solver import Solver
-from py_operators.operator import Operator
-from py_operators.operator_comp import OperatorComp
-from py_utils.section_factory import SectionFactory as sf
-
 import scipy.stats as ss
-
 import os
 import cPickle
 import time
 
-import pdb
+from py_utils.signal_utilities.ws import WS
+import py_utils.signal_utilities.sig_utils as su
+from py_utils.signal_utilities.sig_utils import unflatten_list as unflat_list
+from py_operators.operator import Operator
+from py_operators.operator_comp import OperatorComp
+from py_solvers.solver import Solver
+from py_utils.section_factory import SectionFactory as sf
 
 class MSIST(Solver):
-    """
-    Solver which performs the MSIST algorithm, with several different variants.
+    """Solver which implements the MSIST algorithm and its variants.
+
+    Attributes:
+        alpha (:class:`numpy.ndarray`): :math:`\mathbf{Lambda}_{\alpha}`.
+        H (:class:`py_operators.operator.Operator`): The forward modality.
+        W (:class:`py_operators.operator.Operator`): The forward transorm.
+
+       spatial_threshold (:class:`bool`): 
+           :const:`True` if using a spatial hard threshold.
+           :const:`False` (default) otherwise.
+       spatial_threshold_val (:class:`float`): The spatial hard threhold value.
+       input_complex (:class:`bool`): 
+           :const:`True` if signal to reconstruct is complex.
+           :const:`False` (default) otherwise.
+       input_phase_encoded (:class:`bool`): The signal to reconstruct is
+           phase-encoded.           
+       input_poisson_corrupted (:class:`bool`):
+           :const:`True` means observation is mixed Poisson-Gaussian (MSIST-P).
+           :const:`False` (default) otherwise.
+       sc_factor (:class:`float`): The factor :math:`F` (0,1] to use to adjust
+           the scaling coefficients for wavelet domain variance estimation.
+       convexnu (:class:`bool`): 
+           :const:`True` to use locally convex continuation rule.
+           :const:`False` (default) otherwise.
+       ordepsilon (:class:`bool`): 
+           :const:`True` to use order statistical :math:`\epsilon` continuation.
+           :const:`False` (default) otherwise.
+       ordepsilonpercstart (:class:`float`): Value of starting percentile for 
+           order statistical :math:`\epsilon` continuation.
+       ordepsilonpercstop (:class:`float`): Value of stopping percentile for 
+           order statistical :math:`\epsilon` continuation.
+       hmt (:class:`bool`): 
+           :const:`True` to use parent coefficients in coarse-to-fine precision
+           estimation (MSIST only).
+           :const:`False` (default) otherwise.        
     """
     def __init__(self,ps_params,str_section):
-        """
-        Class constructor for DTCWT
+        """ Class constructor for :class:`py_solvers.so_msist.MSIST`.
+
         """
         super(MSIST,self).__init__(ps_params,str_section)
         self.str_sparse_pen = self.get_val('sparsepenalty',False)
@@ -53,12 +97,9 @@ class MSIST(Solver):
         self.hmt = self.get_val('hmt',True)
         self.ordepsilonpercstop = self.get_val('ordepsilonpercstop',True)
         self.ordepsilonpercstart = self.get_val('ordepsilonpercstart',True)
+        self.profile = self.get_val('profile',True)
                 
     def solve(self,dict_in):
-        """
-        Takes an input object (ground truth, forward model observation, metrics required)
-        Returns a solution object based on the solver this object was instantiated with.
-        """
         super(MSIST,self).solve()
 
         ##################################
@@ -90,8 +131,14 @@ class MSIST(Solver):
             y_hat = fftn(dict_in['y'])
             
         x_n = dict_in['x_0'].copy() #seed current solution
+        # The famous Joan Lasenby "residuals"
         dict_in['x_n'] = x_n
-
+        x = dict_in['x'].copy()
+        dict_in['resid_n'] = x - x_n
+        x_max = np.max(x)
+        x_min = np.min(x)
+        # dict_in['resid_range'] = np.array([x_min - x_max, x_max + x_max])
+        dict_in['resid_range'] = np.array([-255.0/2, 255.0/2])
         #######################
         #Common Initialization#
         #######################
@@ -259,7 +306,6 @@ class MSIST(Solver):
             if self.str_sparse_pen == 'vbmm_hmt':
                 ary_a = self.get_gamma_shapes(W * dict_in['x_0'])
                 b_n = w_n[0] * p_b_0
-            adj_factor = 1.3
     
         #poisson + gaussiang noise, 
         #using the scaling coefficients in the regularization (MSIST-P)
@@ -277,14 +323,15 @@ class MSIST(Solver):
         self.results.update(dict_in)
         print 'Finished itn: n=' + str(0)
         #begin iterations here for the MSIST(-X) algorithm, add some profiling info here
-        dict_profile={}
-        dict_profile['twoft_time']=[]
-        dict_profile['wht_time']=[]
-        dict_profile['other_time']=[]
-        dict_profile['reproj_time_inv']=[]
-        dict_profile['reproj_time_for']=[]
-        dict_in['profiling']=dict_profile
-        t0=time.time()
+        if self.profile:
+            dict_profile={}
+            dict_profile['twoft_time']=[]
+            dict_profile['wht_time']=[]
+            dict_profile['other_time']=[]
+            dict_profile['reproj_time_inv']=[]
+            dict_profile['reproj_time_for']=[]
+            dict_in['profiling']=dict_profile
+            t0=time.time()
         ####################
         ##Begin Iterations##
         ####################
@@ -306,8 +353,9 @@ class MSIST(Solver):
             else:
                 w_resid = [W * ((~H) * f_resid)]
             wht=time.time()
-            dict_profile['twoft_time'].append(twoft_1-twoft_0)
-            dict_profile['wht_time'].append(wht-twoft_1)
+            if self.profile:
+                dict_profile['twoft_time'].append(twoft_1-twoft_0)
+                dict_profile['wht_time'].append(wht-twoft_1)
             ########################
             ######Convex Nu#########
             #####Ord/HMT Epsilon####
@@ -350,13 +398,7 @@ class MSIST(Solver):
 
                         for s in xrange(w_n[0].int_subbands-1,0,-1):
                             sigma_sq_parent_us = nabs(w_n[0].get_upsampled_parent(s))**2
-                                # epsilon_parent_sq = (2.0**(-1.25))*(1.0/g_i*sigma_sq_parent_us + epsilon[n]**2)
-                                # s_parent_sq = 1.0/((2.0**(-2.25))*(1.0/g_i*sigma_sq_parent_us + epsilon[n]**2))
                             s_parent_sq = 1.0/((2.0**(-2.25))*(1.0/g_i*sigma_sq_parent_us))
-                            # s_parent_sq = (2.0**(2.25))*S_n_prev.get_upsampled_parent(s)
-                                # S_n.set_subband(s,(1.0 / 
-                                #                    ((1.0 / g_i) *  
-                                #                     nabs(w_n[0].get_subband(s))**2 + (epsilon_parent_sq))))
                             S_n.set_subband(s,s_parent_sq)                               
                                 
                     else:
@@ -365,7 +407,6 @@ class MSIST(Solver):
             elif (self.str_sparse_pen[0:5] == 'vbmm' and 
                   self.str_sparse_pen[-5:] != 'hmt'): 
                 cplx_norm = 1.0 + self.input_complex
-                #TODO(tim): check this is accurate in complex case
                 S_n = ((g_i + 2.0 * p_a) * 
                        (sum([w_n[ix_].energy() for ix_ in w_n_it]) / cplx_norm
                        + sigma_n + 2.0 * b_n).invert())
@@ -491,21 +532,28 @@ class MSIST(Solver):
 
             #finished spatial domain operations on this iteration, store
             dict_in['x_n'] = x_n
-            
+            # store "residuals"
+            dict_in['resid_n'] = x - x_n
+            # dict_in['resid_range'] = np.array([np.min(dict_in['resid_n']), np.max(dict_in['resid_n'])])
+            print "resid min " + str(np.round(np.min(dict_in['resid_n']), 2))
+            print "resid max " + str(np.round(np.max(dict_in['resid_n']), 2))
+
             if H.str_object_name=='Blur' and H.lgc_even_fft:
                 x_n=su.pad_center(x_n, dict_in['x_0'].shape)
                 
             #############################
             #Wavelet Domain Reprojection#
             #############################
-            dict_profile['other_time'].append(tother-wht) 
+            if self.profile:
+                dict_profile['other_time'].append(tother-wht) 
             if self.input_complex:
                 w_n = [W * x_n.real, W * x_n.imag]
             else:
                 w_n = [W * x_n]
             tforwardwt = time.time()                
-            dict_profile['reproj_time_inv'].append(tinvdwt-tother) 
-            dict_profile['reproj_time_for'].append(tforwardwt-tinvdwt) 
+            if self.profile:
+                dict_profile['reproj_time_inv'].append(tinvdwt-tother) 
+                dict_profile['reproj_time_for'].append(tforwardwt-tinvdwt) 
             if self.str_sparse_pen[:11] == 'l0rl2_group':
                 ls_w_hat_n = [[ls_w_hat_n[ix_][j] * ls_S_hat_sup[j] + 
                                w_bar_n[ix_] * ((ls_S_hat_sup[j]+(-1))*(-1))
@@ -600,72 +648,96 @@ class MSIST(Solver):
         dict_in['ls_w_hat_n']=ls_w_hat_n
         dict_in['w_bar_n']=w_bar_n
 
-    def get_gamma_shapes2(self, ws_coeffs):
-        """Use maximum likelihood to obtain the shape parameters 
-        for each a gamma distribution.
-
-        Return:
-          ary_a (ndarray): a 1-d array of shape parameters
-        """
-        ary_a = np.zeros(ws_coeffs.int_subbands,)
-        for s in xrange(1,ws_coeffs.int_subbands):
-            subband = ws_coeffs.get_subband(s).flatten()
-            subband_ri = np.concatenate((subband.real,subband.imag))
-            fit_nu, fit_loc, fit_scale = ss.t.fit(subband_ri,floc=0)
-            print fit_scale
-            ary_a[s] = fit_nu / 2
-        print ary_a    
-        return ary_a    
-
     def get_gamma_shapes(self, ws_coeffs):
-        """Use maximum likelihood to obtain the shape parameters 
-        for each a gamma distribution.
+        r"""Use maximum likelihood to obtain the shape parameters for a
+        Gauss-Gamma (Student-T) distribution of wavelet coefficients.
 
-        Return:
-          ary_a (ndarray): a 1-d array of shape parameters
+        Args:
+            ws_coeffs (:class:`py_utils.signal_utilities.WS`): The 
+                wavelet coefficents.
+
+        .. note:: Experimental feature to test improvements over
+            using single shape parameter. Works for 2D signals only.
+         
+        Returns:
+            :class:`numpy.ndarray`: A 1-d array of shape parameters.          
         """
         ary_a = np.zeros(ws_coeffs.int_subbands,)
-        # for s in xrange(1,ws_coeffs.int_subbands,6):
-        for s in xrange(1,ws_coeffs.int_subbands,6):
-            for s2 in xrange(s,s+6):
+        for s in xrange(1,ws_coeffs.int_subbands,ws_coeffs.int_orientations):
+            for s2 in xrange(s,s+ws_coeffs.int_orientations):
                 subband = ws_coeffs.get_subband(s2).flatten()
                 subband_ri = np.concatenate((subband.real,subband.imag))
                 if s2==s:
                     subband_tot=np.zeros(subband_ri.size*4)
-                    subband_tot_45=np.zeros(subband_ri.size*2)
+                    tot_45=np.zeros(subband_ri.size*2)
                     index=0
                     index_45=0
                 if np.mod(s2-2,6)==0 or np.mod(s2-5,6)==0:
-                    subband_tot_45[index_45:index_45+subband_ri.size]=subband_ri.copy()
+                    tot_45[index_45:index_45+subband_ri.size]=subband_ri.copy()
                     index_45=index_45+subband_ri.size
                 else:    
                     subband_tot[index:index+subband_ri.size]=subband_ri.copy()
                     index=index+subband_ri.size
             fit_nu, fit_loc, fit_scale = ss.t.fit(subband_tot)
-            # print fit_scale
             ary_a[s] = fit_nu / 2
             ary_a[s+2:s+4] = fit_nu / 2
             ary_a[s+5] = fit_nu / 2
-            fit_nu, fit_loc, fit_scale = ss.t.fit(subband_tot_45)
-            # print fit_scale
+            fit_nu, fit_loc, fit_scale = ss.t.fit(tot_45)
             ary_a[s+1] = fit_nu / 2
             ary_a[s+4] = fit_nu / 2
-        print ary_a    
         return ary_a    
     
     def get_convex_nu(self, w_n, epsilon_sq, alpha_min):
+        r"""Find the minimum guaranteed locally convex :math:`nu`.
+
+        Find the minimum guaranteed locally convex :math:`nu`
+        using the minimum entry of        
+        :math:`\mathbf{Lambda}_{\alpha}`, :math:`{\alpha}_{\min}`, 
+        the value of :math:`\epsilon^2`, and 
+        :math:`\mathbf{w}_{n}` according to the following formula:
+        
+        :math:`\nu^2=\frac{\alpha_{_min}}{8}
+        \min_{m\in\{1\ldots M\}}(w_m^2+4\epsilon^2+\frac{4\epsilon^2}{w_m^2})`
+
+        Args:
+            w_n (:class:`py_utils.signal_utilities.WS`): The  
+                wavelet coefficents.
+            epsilon_sq (:class:`float`): The value of :math:`\epsilon^2`.
+            alpha_min (:class:`float`): The minimum value 
+                of :math:`\mathbf{Lambda}_{\alpha}`.
+
+        .. note:: Experimental feature to test automatic convex continuation.
+         
+        Returns:
+            :class:`float`: The value of :math:`\nu`.
+        """
+
         rhsmin = w_n.energy().flatten()
         rhsmin = rhsmin + 4*epsilon_sq + 4*epsilon_sq**2/rhsmin 
         rhsmin = np.min(rhsmin)
         lhsmin = alpha_min
-        # lhsmin = 1
         return np.sqrt(1.0/8*lhsmin*rhsmin)
     
-    def get_ord_epsilon(self,w_n,epsilon,percetile_n):
+    def get_ord_epsilon(self, w_n, epsilon_max, percetile_n):
+        r"""Find the value of :math:`\epsilon` according to 
+        reference percentile in a vector of wavelet coefficienets.
+
+        Args:
+            w_n (:class:`py_utils.signal_utilities.WS`): The reference
+                wavelet coefficents.
+            epsilon_max (:class:`float`): Max return value of :math:`\epsilon`.
+            percetile_n (:class:`float`): Percentile (0,1) in to return in 
+                reference wavelet coefficients.
+                
+        .. note:: Experimental feature to test automatic percentile-based 
+            continuation. 
+         
+        Returns:
+            :class:`float`: The value of :math:`\epsilon`.
+        """
+
         coeffs = w_n.energy().flatten()
-        print percetile_n
-        print np.sqrt(np.percentile(coeffs,percetile_n))
-        return min(epsilon,np.sqrt(np.percentile(coeffs,percetile_n)))
+        return min(epsilon_max, np.sqrt(np.percentile(coeffs,percetile_n)))
         
     class Factory:
         def create(self,ps_params,str_section):

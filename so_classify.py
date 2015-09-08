@@ -3,29 +3,24 @@ import numpy as np
 from numpy import arange, conj, sqrt,median, abs as nabs, exp, maximum as nmax
 from numpy.fft import fftn, ifftn
 from numpy.linalg import norm
-
 from sklearn import svm,linear_model
 from sklearn.decomposition import PCA
 from sklearn import preprocessing
+import scipy.stats as ss
 
 from py_utils.signal_utilities.scat import Scat
 import py_utils.signal_utilities.sig_utils as su
 from py_solvers.solver import Solver
-from py_operators.operator import Operator
 from py_operators.operator_comp import OperatorComp
 from py_utils.section_factory import SectionFactory as sf
 
-import scipy.stats as ss
-
-import pdb
 
 class Classify(Solver):
-    """
-    General classify class which performs the feature computation, training, and validation.
+    """General classify class which performs the feature computation, training,
+    and validation.
     """
     def __init__(self,ps_params,str_section):
-        """
-        Class constructor for Classify
+        """Class constructor for :class:`py_solvers.so_classify.Classify`.
         """
         super(Classify,self).__init__(ps_params,str_section)
         self.S = OperatorComp(ps_params,self.get_val('transforms',False))
@@ -70,23 +65,22 @@ class Classify(Solver):
             raise ValueError('bad arguments for classifier ' + str(kwargs))    
         
     def solve(self,dict_in):
-        """
-        Takes an input object (ground truth partitioned classification set),
-        computes features, and classifies.
-        """
         super(Classify,self).solve()
         S = self.S
         feature_reduce = Scat().reduce #function handle to static method
         classes = sorted(dict_in['x'].keys())
         dict_in['class_labels']=classes
         if self.feature_sec_in != '': #load the feature vectors from disk
-            sec_input = sf.create_section(self.get_params(),self.feature_sec_in)
-            dict_in['x_feature'] = sec_input.read(dict_in,return_val=True)
-
+            sec_input = sf.create_section(self.get_params(), self.feature_sec_in)
+            dict_in['x_feature'] = sec_input.read(dict_in, return_val = True)
+            
             if self.class_sec_in != '': 
-                #the class specification (csv), should already have been read in sec_input
-                #now organize dict_in['x_feature'] into classes using dict_in['x'] as a reference
-                #dict_in['x_feature'][exemplarid]->dict_in['x_feature'][exemplarclass] 
+                #The class specification (csv), should already have 
+                #been read in sec_input.
+                #Now organize dict_in['x_feature'] into classes 
+                #using dict_in['x'] as a reference
+                #dict_in['x_feature'][exemplarid]->
+                #dict_in['x_feature'][exemplarclass] 
                 #where dict_in['x_feature']['exemplarclass'] is a list
                 print 'organizing classes for this experiment...'
                 for _class in classes:
@@ -95,18 +89,24 @@ class Classify(Solver):
                         exemplar_feature=dict_in['x_feature'].pop(_exemplar[0])
                         dict_in['x_feature'][_class].append(exemplar_feature)
         else:   #no feature vector file specified, so compute
-            met_output_obj = sf.create_section(self.get_params(),self.feature_sec_out)
-            #generate the features if not previously stored from a prior run,takes a while...
+            met_output_obj = sf.create_section(self.get_params(),
+                                               self.feature_sec_out)
+            #generate the features if not previously stored from a prior run
+            #takes a while...
             for _class_index,_class in enumerate(classes):
                 print 'generating scattering features for class ' + _class
                 n_samples = len(dict_in['x'][_class])
-                dict_in['x_feature'][_class]=([feature_reduce((S*dict_in['x'][_class][sample][1]).flatten(),
-                                                              method=self.feature_reduction) for sample in xrange(n_samples)])
+                dict_in['x_feature'][_class]= (
+                  [feature_reduce((S*dict_in['x'][_class][sample][1]).flatten(),
+                                  method = self.feature_reduction)
+                                  for sample in xrange(n_samples)])
 
         #assumes each feature vector is the same size for all exemplars...
-        dict_in['feature_vector_size'] = dict_in['x_feature'][classes[0]][-1].size
-        Xtrain = np.zeros([dict_in['n_training_samples'],dict_in['feature_vector_size']],dtype='double')
-        Xtest = np.zeros([dict_in['n_testing_samples'],dict_in['feature_vector_size']],dtype='double')
+        dict_in['feature_vec_sz'] = dict_in['x_feature'][classes[0]][-1].size
+        Xtrain = np.zeros([dict_in['n_training_samples'],
+                           dict_in['feature_vec_sz']],dtype='double')
+        Xtest = np.zeros([dict_in['n_testing_samples'],
+                          dict_in['feature_vec_sz']],dtype='double')
         
         #vector to hold the training labels
         ytrain = np.zeros(dict_in['n_training_samples'],dtype='int16')
@@ -115,19 +115,19 @@ class Classify(Solver):
         print 'generating training/test data using pre-computed partitions...'
         #generate the training and test data matrix (X) and label vectors (y)
         for _class_index,_class in enumerate(classes):
-            for training_index in dict_in['x_train'][_class]:
-                Xtrain[sample_index,:] = (dict_in['x_feature'][_class][training_index])
+            for train_ix in dict_in['x_train'][_class]:
+                Xtrain[sample_index,:] = (dict_in['x_feature'][_class][train_ix])
                 ytrain[sample_index] = dict_in['y_label'][_class]
                 sample_index+=1
         sample_index = 0
         ls_testing_index = []
         ls_exemplar_id = []
         for _class_index,_class in enumerate(classes):
-            for testing_index in dict_in['x_test'][_class]:
-                Xtest[sample_index,:] = (dict_in['x_feature'][_class][testing_index])
+            for test_ix in dict_in['x_test'][_class]:
+                Xtest[sample_index,:] = (dict_in['x_feature'][_class][test_ix])
                 ytest[sample_index] = dict_in['y_label'][_class]
-                ls_testing_index.append(testing_index)
-                ls_exemplar_id.append(dict_in['x'][_class][testing_index][0])
+                ls_testing_index.append(test_ix)
+                ls_exemplar_id.append(dict_in['x'][_class][test_ix][0])
                 sample_index+=1
                 
         dict_in['y_truth']=ytest
@@ -146,39 +146,43 @@ class Classify(Solver):
         if self.classifier_method=='affinepca':
             dict_in['pca_train']={}
             #we must fit a model separately for each of the class subspaces
-            for _class_index,_class in enumerate(classes):
-                #xclass_features is n_samples (C) X n_features (\barSx_c)
-                xclass_features=Xtrain[ytrain==dict_in['y_label'][_class],:]
-                xclass_features_mean=np.mean(xclass_features,axis=0)
-                #subtract the mean from each sample scattering vector (rows in xclass_features)
-                #and do pca
-                self.clf.fit(xclass_features-xclass_features_mean)
+            for _cls_index,_cls in enumerate(classes):
+                #xcls_feat is n_samples (C) X n_features (\barSx_c)
+                xcls_feat=Xtrain[ytrain==dict_in['y_label'][_cls],:]
+                xcls_feat_mean=np.mean(xcls_feat,axis=0)
+                #subtract the mean from each sample scattering vector 
+                #(rows in xcls_feat) and do pca
+                self.clf.fit(xcls_feat-xcls_feat_mean)
                 #store the components as a list in the pca_train dict
                 #the first element being the mean (scattering class centroid), 
-                #the second: the n_features x n_components array of principal components
-                dict_in['pca_train'][_class]=[xclass_features_mean,self.clf.components_]
-                #now fit the models by minimizing the error in the orthogonal class linear 
-            #space projection
+                #the second: the n_features x n_components array of PCs
+                dict_in['pca_train'][_cls]=[xcls_feat_mean,self.clf.components_]
+            #now fit the models by minimizing the error in the orthogonal linear 
+            #space projection of classes
             #error matrix is (D+1) X ()
             #where D is the number of components in the pca decomposition
             pcaD=self.clf.components_.shape[0]+1
-            error_matrix=np.zeros([pcaD,dict_in['n_testing_samples'],len(classes)])
-            for _class_index,_class in enumerate(classes):      
-                sx_minus_esxc=Xtest-dict_in['pca_train'][_class][0]
-                vc=dict_in['pca_train'][_class][1]
+            err_mtx=np.zeros([pcaD,dict_in['n_testing_samples'],len(classes)])
+            for _cls_index,_cls in enumerate(classes):      
+                sx_minus_esxc=Xtest-dict_in['pca_train'][_cls][0]
+                vc=dict_in['pca_train'][_cls][1]
                 #calculate the orthoganal projection at each d in D
                 #for the first row, sum energy along feature axis
                 err_temp_1 = np.sum(np.abs(sx_minus_esxc)**2,axis=1)
                 err_temp_rest = -(np.abs(vc.dot(sx_minus_esxc.T))**2)
                 # pdb.set_trace()
-                err_temp = np.cumsum(np.vstack([err_temp_1,err_temp_rest]),axis=0)**(.5)
-                error_matrix[:,:,_class_index]=err_temp
-            error_matrix=error_matrix[-1,:,:]    #error matrix is now num_samplesXnum_classes
-            error_mins=np.amin(error_matrix,axis=1)#minimum D+1 error along class dimension
+                err_temp = np.cumsum(np.vstack([err_temp_1,err_temp_rest]),
+                                     axis=0)**(.5)
+                err_mtx[:,:,_cls_index]=err_temp
+            #error matrix is now num_samplesXnum_classes
+            err_mtx=err_mtx[-1,:,:]    
+            #minimum D+1 error along class dimension
+            error_mins=np.amin(err_mtx,axis=1)
             #now find the indices corresponding to these mins
             print 'making prediction...'
-            dict_in['y_pred']=np.array([int(np.where(error_mins[j]==error_matrix[j,:])[0])
-                                        for j in xrange(error_mins.shape[0])])
+            dict_in['y_pred']=np.array([int(
+                np.where(error_mins[j]==err_mtx[j,:])[0])
+                for j in xrange(error_mins.shape[0])])
             dict_in['x_model_params']=dict_in['pca_train']
         else:#svm or some other method
             self.clf.fit(Xtrain,ytrain)
