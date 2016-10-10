@@ -5,7 +5,7 @@ from numpy import abs as nabs, exp, maximum as nmax
 from py_utils.signal_utilities.ws import WS
 import py_utils.signal_utilities.sig_utils as su
 from py_solvers.solver import Solver
-from py_operators.operator import Operator
+from py_operators.operator_ind import Operator
 from py_operators.operator_comp import OperatorComp
 from scipy.optimize import fmin_ncg as ncg
 from numpy.linalg import norm
@@ -22,21 +22,21 @@ class RichardsonLucy(Solver):
     (for widefield microscopy deconvolution)
     """
     def __init__(self,ps_parameters,str_section):
-        """ Class constructor for 
+        """ Class constructor for
         :class:`py_solvers.so_riachardson_lucy.RichardsonLucy`.
 
         Attributes:
-            H (:class:`py_operators.operator.Operator`): The forward modality.
+            H (:class:`py_operators.operator_ind.Operator`): The forward modality.
 
         """
         super(RichardsonLucy,self).__init__(ps_parameters,str_section)
         self.H = OperatorComp(ps_parameters,self.get_val('modalities',False))
         self.H = self.H.ls_ops[0] #assume we just have one transform
-            
+
     def solve(self,dict_in):
         super(RichardsonLucy,self).solve()
         H = self.H
-        #input data 
+        #input data
         x_n = dict_in['x_0'].copy()
         b = dict_in['b']#background
         sigma_sq = dict_in['noisevariance']
@@ -59,10 +59,10 @@ class RichardsonLucy(Solver):
             div=(H*x_n+b)
             twoft_1=time.time()
             if self.profile:
-                dict_profile['twoft_time'].append(twoft_1-twoft_0)            
+                dict_profile['twoft_time'].append(twoft_1-twoft_0)
             other_time_0=time.time()
             div = dict_in['y']/div
-            div[div==np.nan]=0.0    
+            div[div==np.nan]=0.0
             other_time_1=time.time()
             if self.profile:
                 dict_profile['other_time'].append(other_time_1-other_time_0)

@@ -4,10 +4,7 @@
 *.log
 
 #big data matrices
-*64,64,64*
-*128,256,128*
-*184,224,184*
-*.pkl
+application/data
 
 # C extensions
 *.so

@@ -44,7 +44,12 @@ def main():
         ls_file_names = [str_path] #single file execution mode
     for file_name in ls_file_names:
         print 'starting: ' + file_name
-        os.system(ls_prompts[0]+'/main.py ' + file_name + ' ' + str(seed_flag))
+        if hasattr(sys, "real_prefix"):
+            python = sys.prefix + "/bin/python"
+        else:
+            python = "python"
+        dir_ = os.path.dirname(__file__)
+        os.system(python + ' ' + os.path.join(dir_, ls_prompts[0]+'/main.py ') + file_name + ' ' + str(seed_flag))
     
 if __name__ == "__main__":
     main()

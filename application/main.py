@@ -51,4 +51,5 @@ def main():
         if 'profiling' in dict_in:
             pretty2(dict_in['profiling'])
 if __name__ == "__main__":
+    print os.system('which python')
     main()

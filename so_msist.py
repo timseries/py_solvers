@@ -27,7 +27,7 @@ import time
 from py_utils.signal_utilities.ws import WS
 import py_utils.signal_utilities.sig_utils as su
 from py_utils.signal_utilities.sig_utils import unflatten_list as unflat_list
-from py_operators.operator import Operator
+from py_operators.operator_ind import Operator
 from py_operators.operator_comp import OperatorComp
 from py_solvers.solver import Solver
 from py_utils.section_factory import SectionFactory as sf
@@ -37,8 +37,8 @@ class MSIST(Solver):
 
     Attributes:
         alpha (:class:`numpy.ndarray`): :math:`\mathbf{Lambda}_{\alpha}`.
-        H (:class:`py_operators.operator.Operator`): The forward modality.
-        W (:class:`py_operators.operator.Operator`): The forward transorm.
+        H (:class:`py_operators.operator_ind.Operator`): The forward modality.
+        W (:class:`py_operators.operator_ind.Operator`): The forward transorm.
 
        spatial_threshold (:class:`bool`):
            :const:`True` if using a spatial hard threshold.
